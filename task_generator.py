@@ -1,3 +1,3 @@
-from config import data_choicemaker, taskmaker, textworker, dbworker
+from config import data_choicemaker, taskmaker
 
 taskmaker(data_choicemaker())
