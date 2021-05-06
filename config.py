@@ -45,7 +45,6 @@ def textworker():
         from nltk import download
         download('punkt')
         sentences_list = sent_tokenize(text)
-    del text
 
     import pymorphy2
     morph = pymorphy2.MorphAnalyzer(lang="uk")
@@ -67,12 +66,9 @@ def textworker():
                     for h in range(len(morph.parse(word_list[j]))):
                         if {"Fixd"} in morph.parse(word_list[j])[h].tag:
                             continue
-                        else:
-                            if morph.parse(word_list[j])[h].tag.POS == "NPRO":
-                                p = morph.parse(word_list[j])[h]
-                                break
-                            else:
-                                continue
+                        if morph.parse(word_list[j])[h].tag.POS == "NPRO":
+                            p = morph.parse(word_list[j])[h]
+                            break
                     else:
                         continue
             except IndexError:
@@ -94,7 +90,6 @@ def textworker():
             except AttributeError:
                 continue
 
-        del word_list
         return pronoun_list
 
     analysed = []
@@ -104,8 +99,6 @@ def textworker():
             for q in i_analysis:
                 analysed.append(q)
 
-    del morph
-    del sentences_list
     return analysed
 
 
@@ -122,11 +115,11 @@ def dbworker(analysed, filename="pronouns.csv"):
     for i in analysed:
         if i in rows:
             continue
-        else:
-            new_rows.append(i)
+        new_rows.append(i)
 
     new_data = pd.DataFrame(new_rows, columns=["word_number", "sentence", "pronoun", "variants"])
-    new_data.to_csv(filename, sep=";", quotechar="\\", encoding="windows-1251", header=0, mode="a", index=False)
+    new_data.to_csv(filename, sep=";", quotechar="\\", mode="a",
+                    encoding="windows-1251", header=0, index=False)
 
     data = rows + new_rows
     return data
@@ -160,7 +153,6 @@ def taskmaker(data_lines):
 
     from random import sample, shuffle
     random_lines = sample(data_lines, k=quantity)
-    del data_lines
 
     from re import fullmatch
     from ast import literal_eval
