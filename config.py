@@ -1,19 +1,22 @@
 def data_choicemaker():
-    mode = input("Введіть 1, якщо Ви хочете використовувати вже наявні тексти.\n"
-                 "Введіть 2, якщо Ви хочете використати власний текст і внести його до бази даних.\n"
-                 "Введіть 3, якщо Ви хочете використати власний текст без внесення його до бази даних.\n")
-    if mode not in "123":
-        print("Невірний формат відповіді. Будь ласка, спробуйте ще раз.")
-        data_choicemaker()
+    def choice_input():
+        chosen_mode = input("Введіть 1, якщо Ви хочете використовувати вже наявні тексти.\n"
+                            "Введіть 2, якщо Ви хочете використати власний текст і внести його до бази даних.\n"
+                            "Введіть 3, якщо Ви хочете використати власний текст без внесення його до бази даних.\n")
+        if chosen_mode not in "123":
+            print("Невірний формат відповіді. Будь ласка, спробуйте ще раз.")
+            chosen_mode = data_choicemaker()
 
+        return chosen_mode
+
+    mode = choice_input()
     if mode == "1":
-        import csv
-        with open("pronouns.csv", "r", encoding="windows-1251") as f:
-            reader = csv.reader(f, quoting=csv.QUOTE_NONE, delimiter=";", escapechar=' ')
-            fields = next(reader)
-            data_lines = []
-            for row in reader:
-                data_lines.append(row)
+        import pandas as pd
+        from ast import literal_eval
+        read_data = pd.read_csv("pronouns.csv", sep=";", quotechar="\\", encoding="windows-1251", header=0,
+                                dtype={"word_number": int, "pronoun": str},
+                                converters={"sentence": literal_eval, "variants": literal_eval})
+        data_lines = [list(row) for row in read_data.values]
     elif mode == "2":
         data_lines = dbworker(textworker())
     else:
@@ -23,14 +26,18 @@ def data_choicemaker():
 
 
 def textworker():
-    filename = input("Введіть назву свого файлу або повний шлях до нього:\n")
-    try:
-        with open(filename, "r", encoding="windows-1251") as f:
-            text = f.read()
-    except IOError:
-        print("Вибачте, такого файлу не існує. Спробуйте ще раз.")
-        textworker()
+    def filename_input():
+        filename = input("Введіть назву свого файлу або повний шлях до нього:\n")
+        try:
+            with open(filename, "r", encoding="windows-1251") as f:
+                read_text = f.read()
+        except IOError:
+            print("Вибачте, такого файлу не існує. Спробуйте ще раз.")
+            read_text = textworker()
 
+        return read_text
+
+    text = filename_input()
     from nltk.tokenize import sent_tokenize
     try:
         sentences_list = sent_tokenize(text)
@@ -63,6 +70,11 @@ def textworker():
                         else:
                             if morph.parse(word_list[j])[h].tag.POS == "NPRO":
                                 p = morph.parse(word_list[j])[h]
+                                break
+                            else:
+                                continue
+                    else:
+                        continue
             except IndexError:
                 continue
 
@@ -98,36 +110,42 @@ def textworker():
 
 
 def dbworker(analysed, filename="pronouns.csv"):
-    import csv
-    with open(filename, "r+", encoding="windows-1251", newline="") as csvfile:  # потім додати можливість перезапису ДБ з нуля
-        csvreader = csv.reader(csvfile, quoting=csv.QUOTE_NONE, delimiter=";", escapechar=' ')
-        csvwriter = csv.writer(csvfile, quoting=csv.QUOTE_NONE, delimiter=";", escapechar=' ')
-        fields = next(csvreader)
-        rows = []
-        for row in csvreader:
-            rows.append(row)
+    import pandas as pd
+    from ast import literal_eval
 
-        for i in analysed:
-            if i in rows or i == []:
-                continue
-            else:
-                csvwriter.writerow(i)
-                rows.append(i)
+    read_data = pd.read_csv(filename, sep=";", quotechar="\\", encoding="windows-1251", header=0,
+                            dtype={"word_number": int, "pronoun": str},
+                            converters={"sentence": literal_eval, "variants": literal_eval})
+    rows = [list(row) for row in read_data.values]
 
-    data = rows
-    print(data)
+    new_rows = []
+    for i in analysed:
+        if i in rows:
+            continue
+        else:
+            new_rows.append(i)
+
+    new_data = pd.DataFrame(new_rows, columns=["word_number", "sentence", "pronoun", "variants"])
+    new_data.to_csv(filename, sep=";", quotechar="\\", encoding="windows-1251", header=0, mode="a", index=False)
+
+    data = rows + new_rows
     return data
 
 
 def taskmaker(data_lines):
-    try:
-        quantity = int(input("Введіть бажану кількість питань. Наразі доступно: {}.\n".format(len(data_lines))))
-        if quantity > len(data_lines):
-            quantity = len(data_lines)
-            print("На жаль, такої кількості питань не має в наявності. Буде надано: {}.".format(quantity))
-    except ValueError:
-        print("Невірний формат відповіді; приймаються виключно цілі числа. Будь ласка, спробуйте ще раз.")
-        taskmaker(data_lines)
+    def quantity_chooser(quantity_lines):
+        try:
+            quantity_input = int(input("Введіть бажану кількість питань. Наразі доступно: {}.\n".format(quantity_lines)))
+            if quantity_input > len(data_lines):
+                quantity_input = len(data_lines)
+                print("На жаль, такої кількості питань не має в наявності. Буде надано: {}.".format(quantity_input))
+            else:
+                return quantity_input
+        except ValueError:
+            print("Невірний формат відповіді; приймаються виключно цілі числа. Будь ласка, спробуйте ще раз.")
+            quantity_input = quantity_chooser(quantity_lines)
+
+        return quantity_input
 
     # def grading_choicemaker():
     #     grading = input("Введіть 1, якщо Ви хочете отримувати правильні відповіді одразу після завдань.\n"
@@ -137,6 +155,8 @@ def taskmaker(data_lines):
     #         print("Невірний формат відповіді. Будь ласка, спробуйте ще раз.")
     #         grading_choicemaker()
     #     return grading
+
+    quantity = quantity_chooser(len(data_lines))
 
     from random import sample, shuffle
     random_lines = sample(data_lines, k=quantity)
