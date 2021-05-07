@@ -26,7 +26,7 @@ There are options of choosing the number of questions to work with and the type 
 
 You may need to have installed those Python 3.x modules for the program to work correctly: pandas (and numpy), pymorphy2 (and pymorphy2-dicts-uk), nltk.
 Without the last two, only the 1st feature will work — exercise generation from the existing DB.
-You have to have the Microsoft Visual C++ compiler for nltk module to work.
+You have to have the Microsoft Visual C++ compiler installed for nltk module to work.
 
 Feel free to message me in Telegram for any questions: t.me/your_lithium
 
