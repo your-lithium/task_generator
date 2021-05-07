@@ -1,6 +1,7 @@
 # task_generator
 
 (English below)
+
 Невеличкий проект, що має на меті автоматичну генерацію вправ про займенники з декількома варіантами відповіді для вивчення української мови як іноземної.
 Найкраще підходить для рівня володіння українською А1.
 
@@ -12,6 +13,7 @@
 Для роботи nltk повинно бути встановленим середовище Microsoft Visual C++.
 
 Щодо будь-яких питань можна звертатися у Telegram: t.me/your_lithium
+
 ฅ^•ﻌ•^ฅ
 
 
@@ -27,4 +29,5 @@ Without the last two, only the 1st feature will work — exercise generation fro
 You have to have the Microsoft Visual C++ compiler for nltk module to work.
 
 Feel free to message me in Telegram for any questions: t.me/your_lithium
+
 ฅ^•ﻌ•^ฅ
