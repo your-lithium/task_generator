@@ -1,3 +1,3 @@
-from config import data_choicemaker, taskmaker
+from config import data_choicemaker, task_grading_executor
 
-taskmaker(data_choicemaker())
+task_grading_executor(data_choicemaker())

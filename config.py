@@ -53,7 +53,7 @@ def textworker():
     def analysis(sentence):
         word_list = findall("[\w']+|[\(\)\.!?:,—\;]", sentence)
         pronoun_list = []
-        for j in range(len(word_list)-1):
+        for j in range(len(word_list) - 1):
             try:
                 if {"Fixd"} not in morph.parse(word_list[j])[0].tag:
                     if morph.parse(word_list[j])[0].tag.POS == "NPRO":
@@ -125,31 +125,22 @@ def dbworker(analysed, filename="pronouns.csv"):
     return data
 
 
-def taskmaker(data_lines):
-    def quantity_chooser(quantity_lines):
+def task_grading_executor(data_lines):
+    def quantity_choicemaker(quantity_lines):
         try:
-            quantity_input = int(input("Введіть бажану кількість питань. Наразі доступно: {}.\n".format(quantity_lines)))
-            if quantity_input > len(data_lines):
-                quantity_input = len(data_lines)
-                print("На жаль, такої кількості питань не має в наявності. Буде надано: {}.".format(quantity_input))
+            chosen_quantity = int(input("Введіть бажану кількість питань. Наразі доступно: {}.\n".format(quantity_lines)))
+            if chosen_quantity > len(data_lines):
+                chosen_quantity = len(data_lines)
+                print("На жаль, такої кількості питань не має в наявності. Буде надано: {}.".format(chosen_quantity))
             else:
-                return quantity_input
+                return chosen_quantity
         except ValueError:
             print("Невірний формат відповіді; приймаються виключно цілі числа. Будь ласка, спробуйте ще раз.")
-            quantity_input = quantity_chooser(quantity_lines)
+            chosen_quantity = quantity_choicemaker(quantity_lines)
 
-        return quantity_input
+        return chosen_quantity
 
-    # def grading_choicemaker():
-    #     grading = input("Введіть 1, якщо Ви хочете отримувати правильні відповіді одразу після завдань.\n"
-    #                     "Введіть 2, якщо Ви хочете отримувати відповіді одразу після завдань, а також оцінку наприкінці.\n"
-    #                     "Введіть 3, якщо Ви хочете отримувати оцінку та правильні відповіді наприкінці.\n")
-    #     if grading not in "123":
-    #         print("Невірний формат відповіді. Будь ласка, спробуйте ще раз.")
-    #         grading_choicemaker()
-    #     return grading
-
-    quantity = quantity_chooser(len(data_lines))
+    quantity = quantity_choicemaker(len(data_lines))
 
     from random import sample, shuffle
     random_lines = sample(data_lines, k=quantity)
@@ -157,31 +148,95 @@ def taskmaker(data_lines):
     from re import fullmatch
     from ast import literal_eval
 
-    for i in random_lines:
-        number = int(i[0])
-        if type(i[1]) is not list:
-            sentence = literal_eval(i[1])
+    def task_maker(line):
+        number = int(line[0])
+        if type(line[1]) is not list:
+            sentence = literal_eval(line[1])
         else:
-            sentence = i[1]
-        correct = i[2]
+            sentence = line[1]
+        correct = line[2]
 
         question = ""
         for j in range(len(sentence)):
             word = sentence[j]
             if j != number:
-                if fullmatch("[\w']+|[—\)\.,:;]", word) and j+1 != len(sentence) \
-                        and sentence[j+1] not in ".!?,:;)":
+                if fullmatch("[\w']+|[—\)\.,:;]", word) and j + 1 != len(sentence) \
+                        and sentence[j + 1] not in ".!?,:;)":
                     question += word + " "
                 else:
                     question += word
             else:
                 question += "___ "
 
-        if type(i[3]) is not list:
-            variants = literal_eval(i[3])
+        if type(line[3]) is not list:
+            variants = literal_eval(line[3])
         else:
-            variants = i[3]
+            variants = line[3]
         variants = sample(variants, k=2)
         variants.append(correct)
         shuffle(variants)
-        users = input("{}\nA)  {}\nБ)  {}\nВ)  {}\n".format(question, variants[0], variants[1], variants[2]))
+
+        users = input("{}\nA)  {}\nБ)  {}\nВ)  {}\n".format(question, variants[0], variants[1], variants[2])).capitalize()
+        if users not in "АБВ":
+            print("Вибачте, ви ввели відповідь у некоректному форматі. Будь ласка, спробуйте ще раз.\n")
+            users, correct, correct_letter, question = task_maker(line)
+
+        correct_index = variants.index(correct)
+        if correct_index == "0":
+            correct_letter = "А"
+        elif correct_index == "0":
+            correct_letter = "Б"
+        else:
+            correct_letter = "В"
+
+        return correct, users, correct_letter, question
+
+    def grading_choicemaker():
+        chosen_grading = input("Введіть 1, якщо Ви хочете отримувати правильні відповіді одразу після завдань.\n"
+                               "Введіть 2, якщо Ви хочете отримувати відповіді одразу після завдань, а також оцінку наприкінці.\n"
+                               "Введіть 3, якщо Ви хочете отримувати оцінку та правильні відповіді наприкінці.\n")
+        if chosen_grading not in "123":
+            print("Невірний формат відповіді. Будь ласка, спробуйте ще раз.\n")
+            chosen_grading = grading_choicemaker()
+
+        return chosen_grading
+
+    grading = grading_choicemaker()
+
+    if grading == "1":
+        for i in random_lines:
+            correct_answer, *not_needed, = task_maker(i)
+            print(correct_answer)
+
+        input()
+    elif grading == "2":
+        correct_quantity = 0
+
+        for i in random_lines:
+            correct_word, answer, correct_answer, not_needed = task_maker(i)
+            print("Правильна відповідь: {}.\n".format(correct_word))
+            if answer == correct_answer:
+                correct_quantity += 1
+
+        percentage = correct_quantity/quantity*100
+        print("Ви виконали {} з {} завдань правильно. Процент правильних відповідей: {}%".format(correct_quantity, quantity, percentage))
+        input()
+
+    else:
+        correct_quantity = 0
+        incorrect_dict = dict()
+
+        for i in random_lines:
+            correct_word, answer, correct_answer, sentence = task_maker(i)
+            if answer == correct_answer:
+                correct_quantity += 1
+            else:
+                incorrect_dict[sentence] = correct_word
+
+        print("Ваша відповідь була неправильною у таких реченнях:\n")
+        for i in incorrect_dict:
+            print('У реченні "{}" мав бути займенник "{}".'.format(i, incorrect_dict[i]))
+
+        percentage = correct_quantity/quantity*100
+        print("Ви виконали {} з {} завдань правильно. Процент правильних відповідей: {}%".format(correct_quantity, quantity, percentage))
+        input()
