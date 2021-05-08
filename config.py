@@ -225,7 +225,7 @@ def task_grading_executor(data_lines):
 
     else:
         correct_quantity = 0
-        incorrect_dict = dict()
+        incorrect_dict = {}
 
         for i in random_lines:
             correct_word, answer, correct_answer, sentence = task_maker(i)
