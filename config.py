@@ -63,11 +63,11 @@ def textworker():
                     else:
                         continue
                 else:
-                    for h in range(len(morph.parse(word_list[j]))):
-                        if {"Fixd"} in morph.parse(word_list[j])[h].tag:
+                    for h, parse in enumerate(morph.parse(word_list[j])):
+                        if {"Fixd"} in parse.tag:
                             continue
-                        if morph.parse(word_list[j])[h].tag.POS == "NPRO":
-                            p = morph.parse(word_list[j])[h]
+                        if parse.tag.POS == "NPRO":
+                            p = parse
                             break
                     else:
                         continue
@@ -77,14 +77,14 @@ def textworker():
             cases = [{"nomn"}, {"gent"}, {"datv"}, {"accs"}, {"loct"}]
             try:
                 variants = []
-                for q in cases:
-                    word_case = p.inflect(q).word
+                for s in cases:
+                    word_case = p.inflect(s).word
                     if word_case not in variants and word_case != word_list[j].lower():
                         variants.append(word_case)
 
                 if word_list[j].lower() != word_list[j]:
-                    for k in range(len(variants)):
-                        variants[k] = variants[k].capitalize()
+                    for k, variant in enumerate(variants):
+                        variants[k] = variant.capitalize()
 
                 pronoun_list.append([j, word_list, word_list[j], variants])
             except AttributeError:
@@ -157,8 +157,7 @@ def task_grading_executor(data_lines):
         correct = line[2]
 
         question = ""
-        for j in range(len(sentence_list)):
-            word = sentence_list[j]
+        for j, word in enumerate(sentence_list):
             if j != number:
                 if fullmatch("[\w']+|[—\)\.,:;]", word) and j + 1 != len(sentence_list) \
                         and sentence_list[j + 1] not in ".!?,:;)":
@@ -206,6 +205,7 @@ def task_grading_executor(data_lines):
     if grading == "1":
         for i in random_lines:
             correct_answer, *not_needed, = task_maker(i)
+            del not_needed
             print(correct_answer)
 
         input()
@@ -215,6 +215,7 @@ def task_grading_executor(data_lines):
 
         for i in random_lines:
             correct_word, answer, correct_answer, not_needed = task_maker(i)
+            del not_needed
             print("Правильна відповідь: {}.\n".format(correct_word))
             if answer == correct_answer:
                 correct_quantity += 1
@@ -225,7 +226,7 @@ def task_grading_executor(data_lines):
 
     else:
         correct_quantity = 0
-        incorrect_dict = dict()
+        incorrect_dict = {}
 
         for i in random_lines:
             correct_word, answer, correct_answer, sentence = task_maker(i)
