@@ -120,9 +120,13 @@ def dbworker(analysed):
     import pandas as pd
     from ast import literal_eval
 
-    read_data = pd.read_csv(filename, sep=";", quotechar="\\", encoding="windows-1251", header=0,
-                            dtype={"word_number": int, "pronoun": str},
-                            converters={"sentence": literal_eval, "variants": literal_eval})
+    try:
+        read_data = pd.read_csv(filename, sep=";", quotechar="\\", encoding="windows-1251", header=0,
+                                dtype={"word_number": int, "pronoun": str},
+                                converters={"sentence": literal_eval, "variants": literal_eval})
+    except pd.errors.EmptyDataError:
+        read_data = pd.DataFrame(columns=["word_number", "sentence", "pronoun", "variants"])
+
     rows = [list(row) for row in read_data.values]
 
     new_rows = []
@@ -220,8 +224,7 @@ def task_grading_executor(data_lines):
 
     if grading == "1":
         for i in random_lines:
-            correct_answer, *not_needed, = task_maker(i)
-            del not_needed
+            correct_answer = task_maker(i)[0]
             print(correct_answer)
 
         input()
@@ -231,7 +234,6 @@ def task_grading_executor(data_lines):
 
         for i in random_lines:
             correct_word, answer, correct_answer, not_needed = task_maker(i)
-            del not_needed
             print("Правильна відповідь: {}.\n".format(correct_word))
             if answer == correct_answer:
                 correct_quantity += 1
@@ -252,9 +254,9 @@ def task_grading_executor(data_lines):
                 incorrect_dict[sentence] = correct_word
 
         if incorrect_dict != {}:
-            print("\nВаша відповідь була неправильною у таких реченнях:\n")
-        for i in incorrect_dict:
-            print('У реченні "{}" мав бути займенник "{}".'.format(i, incorrect_dict[i]))
+            print("\nВаша відповідь була неправильною у таких реченнях:")
+        for k, v in incorrect_dict.items():
+            print('У реченні "{}" мав бути займенник "{}".'.format(k, v))
 
         percentage = correct_quantity/quantity*100
         print("\nВи виконали {} з {} завдань правильно. Процент правильних відповідей: {}%".format(correct_quantity, quantity, percentage))
