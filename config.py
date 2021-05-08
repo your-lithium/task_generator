@@ -131,11 +131,11 @@ def task_grading_executor(data_lines):
             chosen_quantity = int(input("Введіть бажану кількість питань. Наразі доступно: {}.\n".format(quantity_lines)))
             if chosen_quantity > len(data_lines):
                 chosen_quantity = len(data_lines)
-                print("На жаль, такої кількості питань не має в наявності. Буде надано: {}.".format(chosen_quantity))
+                print("На жаль, такої кількості питань не має в наявності. Буде надано: {}.\n".format(chosen_quantity))
             else:
                 return chosen_quantity
         except ValueError:
-            print("Невірний формат відповіді; приймаються виключно цілі числа. Будь ласка, спробуйте ще раз.")
+            print("Невірний формат відповіді; приймаються виключно цілі числа. Будь ласка, спробуйте ще раз.\n")
             chosen_quantity = quantity_choicemaker(quantity_lines)
 
         return chosen_quantity
@@ -151,17 +151,17 @@ def task_grading_executor(data_lines):
     def task_maker(line):
         number = int(line[0])
         if type(line[1]) is not list:
-            sentence = literal_eval(line[1])
+            sentence_list = literal_eval(line[1])
         else:
-            sentence = line[1]
+            sentence_list = line[1]
         correct = line[2]
 
         question = ""
-        for j in range(len(sentence)):
-            word = sentence[j]
+        for j in range(len(sentence_list)):
+            word = sentence_list[j]
             if j != number:
-                if fullmatch("[\w']+|[—\)\.,:;]", word) and j + 1 != len(sentence) \
-                        and sentence[j + 1] not in ".!?,:;)":
+                if fullmatch("[\w']+|[—\)\.,:;]", word) and j + 1 != len(sentence_list) \
+                        and sentence_list[j + 1] not in ".!?,:;)":
                     question += word + " "
                 else:
                     question += word
@@ -182,9 +182,9 @@ def task_grading_executor(data_lines):
             users, correct, correct_letter, question = task_maker(line)
 
         correct_index = variants.index(correct)
-        if correct_index == "0":
+        if correct_index == 0:
             correct_letter = "А"
-        elif correct_index == "0":
+        elif correct_index == 1:
             correct_letter = "Б"
         else:
             correct_letter = "В"
@@ -209,6 +209,7 @@ def task_grading_executor(data_lines):
             print(correct_answer)
 
         input()
+
     elif grading == "2":
         correct_quantity = 0
 
