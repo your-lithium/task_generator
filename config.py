@@ -4,8 +4,8 @@ def data_choicemaker():
                             "Введіть 2, якщо Ви хочете використати власний текст і внести його до бази даних.\n"
                             "Введіть 3, якщо Ви хочете використати власний текст без внесення його до бази даних.\n")
         if chosen_mode not in "123":
-            print("Невірний формат відповіді. Будь ласка, спробуйте ще раз.")
-            chosen_mode = data_choicemaker()
+            print("Невірний формат відповіді. Будь ласка, спробуйте ще раз.\n")
+            chosen_mode = choice_input()
 
         return chosen_mode
 
@@ -27,13 +27,13 @@ def data_choicemaker():
 
 def textworker():
     def filename_input():
-        filename = input("Введіть назву свого файлу або повний шлях до нього:\n")
+        filename = input("\nВведіть назву файлу зі своїм текстом або повний шлях до нього:\n")
         try:
             with open(filename, "r", encoding="windows-1251") as f:
                 read_text = f.read()
         except IOError:
             print("Вибачте, такого файлу не існує. Спробуйте ще раз.")
-            read_text = textworker()
+            read_text = filename_input()
 
         return read_text
 
@@ -53,17 +53,17 @@ def textworker():
     def analysis(sentence):
         word_list = findall("[\w']+|[\(\)\.!?:,—\;]", sentence)
         pronoun_list = []
-        for j in range(len(word_list) - 1):
+        for j, word in enumerate(word_list):
             try:
-                if {"Fixd"} not in morph.parse(word_list[j])[0].tag:
-                    if morph.parse(word_list[j])[0].tag.POS == "NPRO":
+                if {"Fixd"} not in morph.parse(word)[0].tag:
+                    if morph.parse(word)[0].tag.POS == "NPRO":
                         p = morph.parse(word_list[j])[0]
-                    elif morph.parse(word_list[j])[1].tag.POS == "NPRO":
-                        p = morph.parse(word_list[j])[1]
+                    elif morph.parse(word)[1].tag.POS == "NPRO":
+                        p = morph.parse(word)[1]
                     else:
                         continue
                 else:
-                    for h, parse in enumerate(morph.parse(word_list[j])):
+                    for parse in morph.parse(word):
                         if {"Fixd"} in parse.tag:
                             continue
                         if parse.tag.POS == "NPRO":
@@ -79,14 +79,14 @@ def textworker():
                 variants = []
                 for s in cases:
                     word_case = p.inflect(s).word
-                    if word_case not in variants and word_case != word_list[j].lower():
+                    if word_case not in variants and word_case != word.lower():
                         variants.append(word_case)
 
-                if word_list[j].lower() != word_list[j]:
+                if word.lower() != word:
                     for k, variant in enumerate(variants):
                         variants[k] = variant.capitalize()
 
-                pronoun_list.append([j, word_list, word_list[j], variants])
+                pronoun_list.append([j, word_list, word, variants])
             except AttributeError:
                 continue
 
@@ -102,7 +102,21 @@ def textworker():
     return analysed
 
 
-def dbworker(analysed, filename="pronouns.csv"):
+def dbworker(analysed):
+    def db_chooser():
+        chosen_filename = input("\nЯкщо ви НЕ хочете користуватися стандартною базою даних pronouns.csv, введіть назву файлу з вашою БД.\n"
+                                "Якщо ви хочете користуватися стандартною БД, натисніть Enter.\n")
+        if chosen_filename == "":
+            chosen_filename = "pronouns.csv"
+
+        if isfile(chosen_filename) is not True:
+            print("Некоректна назва файлу. Будь ласка, спробуйте ще раз.")
+            chosen_filename = db_chooser()
+
+        return chosen_filename
+
+    from os.path import isfile
+    filename = db_chooser()
     import pandas as pd
     from ast import literal_eval
 
@@ -128,14 +142,14 @@ def dbworker(analysed, filename="pronouns.csv"):
 def task_grading_executor(data_lines):
     def quantity_choicemaker(quantity_lines):
         try:
-            chosen_quantity = int(input("Введіть бажану кількість питань. Наразі доступно: {}.\n".format(quantity_lines)))
+            chosen_quantity = int(input("\nВведіть бажану кількість питань. Наразі доступно: {}.\n".format(quantity_lines)))
             if chosen_quantity > len(data_lines):
                 chosen_quantity = len(data_lines)
                 print("На жаль, такої кількості питань не має в наявності. Буде надано: {}.\n".format(chosen_quantity))
             else:
                 return chosen_quantity
         except ValueError:
-            print("Невірний формат відповіді; приймаються виключно цілі числа. Будь ласка, спробуйте ще раз.\n")
+            print("Невірний формат відповіді; приймаються виключно цілі числа. Будь ласка, спробуйте ще раз.")
             chosen_quantity = quantity_choicemaker(quantity_lines)
 
         return chosen_quantity
@@ -175,10 +189,7 @@ def task_grading_executor(data_lines):
         variants.append(correct)
         shuffle(variants)
 
-        users = input("{}\nA)  {}\nБ)  {}\nВ)  {}\n".format(question, variants[0], variants[1], variants[2])).capitalize()
-        if users not in "АБВ":
-            print("Вибачте, ви ввели відповідь у некоректному форматі. Будь ласка, спробуйте ще раз.\n")
-            users, correct, correct_letter, question = task_maker(line)
+        users = input("\n{}\nA)  {}\nБ)  {}\nВ)  {}\n".format(question, variants[0], variants[1], variants[2])).capitalize()
 
         correct_index = variants.index(correct)
         if correct_index == 0:
@@ -188,14 +199,19 @@ def task_grading_executor(data_lines):
         else:
             correct_letter = "В"
 
+        if users not in "АБВ":
+            print("Вибачте, ви ввели відповідь у некоректному форматі. Будь ласка, спробуйте ще раз.")
+            correct, users, correct_letter, question = task_maker(line)
+            print()
+
         return correct, users, correct_letter, question
 
     def grading_choicemaker():
-        chosen_grading = input("Введіть 1, якщо Ви хочете отримувати правильні відповіді одразу після завдань.\n"
+        chosen_grading = input("\nВведіть 1, якщо Ви хочете отримувати правильні відповіді одразу після завдань.\n"
                                "Введіть 2, якщо Ви хочете отримувати відповіді одразу після завдань, а також оцінку наприкінці.\n"
                                "Введіть 3, якщо Ви хочете отримувати оцінку та правильні відповіді наприкінці.\n")
         if chosen_grading not in "123":
-            print("Невірний формат відповіді. Будь ласка, спробуйте ще раз.\n")
+            print("Невірний формат відповіді. Будь ласка, спробуйте ще раз.")
             chosen_grading = grading_choicemaker()
 
         return chosen_grading
@@ -221,7 +237,7 @@ def task_grading_executor(data_lines):
                 correct_quantity += 1
 
         percentage = correct_quantity/quantity*100
-        print("Ви виконали {} з {} завдань правильно. Процент правильних відповідей: {}%".format(correct_quantity, quantity, percentage))
+        print("\nВи виконали {} з {} завдань правильно. Процент правильних відповідей: {}%".format(correct_quantity, quantity, percentage))
         input()
 
     else:
@@ -235,10 +251,12 @@ def task_grading_executor(data_lines):
             else:
                 incorrect_dict[sentence] = correct_word
 
-        print("Ваша відповідь була неправильною у таких реченнях:\n")
+        if incorrect_dict != {}:
+            print("\nВаша відповідь була неправильною у таких реченнях:\n")
         for i in incorrect_dict:
             print('У реченні "{}" мав бути займенник "{}".'.format(i, incorrect_dict[i]))
 
         percentage = correct_quantity/quantity*100
-        print("Ви виконали {} з {} завдань правильно. Процент правильних відповідей: {}%".format(correct_quantity, quantity, percentage))
-        input()
+        print("\nВи виконали {} з {} завдань правильно. Процент правильних відповідей: {}%".format(correct_quantity, quantity, percentage))
+
+    input("Натисніть Enter, щоб зупинити програму (можливо, зачиниться вікно програми).")
