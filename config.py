@@ -233,7 +233,7 @@ def task_grading_executor(data_lines):
         correct_quantity = 0
 
         for i in random_lines:
-            correct_word, answer, correct_answer, not_needed = task_maker(i)
+            correct_word, answer, correct_answer = task_maker(i)[:-1]
             print("Правильна відповідь: {}.\n".format(correct_word))
             if answer == correct_answer:
                 correct_quantity += 1
