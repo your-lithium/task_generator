@@ -1,30 +1,3 @@
-def data_choicemaker():
-    def choice_input():
-        chosen_mode = input("Введіть 1, якщо Ви хочете використовувати вже наявні тексти.\n"
-                            "Введіть 2, якщо Ви хочете використати власний текст і внести його до бази даних.\n"
-                            "Введіть 3, якщо Ви хочете використати власний текст без внесення його до бази даних.\n")
-        if chosen_mode not in "123":
-            print("Невірний формат відповіді. Будь ласка, спробуйте ще раз.\n")
-            chosen_mode = choice_input()
-
-        return chosen_mode
-
-    mode = choice_input()
-    if mode == "1":
-        import pandas as pd
-        from ast import literal_eval
-        read_data = pd.read_csv("pronouns.csv", sep=";", quotechar="\\", encoding="windows-1251", header=0,
-                                dtype={"word_number": int, "pronoun": str},
-                                converters={"sentence": literal_eval, "variants": literal_eval})
-        data_lines = [list(row) for row in read_data.values]
-    elif mode == "2":
-        data_lines = dbworker(textworker())
-    else:
-        data_lines = textworker()
-
-    return data_lines
-
-
 def textworker():
     def filename_input():
         filename = input("\nВведіть назву файлу зі своїм текстом або повний шлях до нього:\n")
@@ -143,7 +116,33 @@ def dbworker(analysed):
     return data
 
 
-def task_grading_executor(data_lines):
+def task_grading_executor():
+    def data_choicemaker():
+        def choice_input():
+            chosen_mode = input("Введіть 1, якщо Ви хочете використовувати вже наявні тексти.\n"
+                                "Введіть 2, якщо Ви хочете використати власний текст і внести його до бази даних.\n"
+                                "Введіть 3, якщо Ви хочете використати власний текст без внесення його до бази даних.\n")
+            if chosen_mode not in "123":
+                print("Невірний формат відповіді. Будь ласка, спробуйте ще раз.\n")
+                chosen_mode = choice_input()
+
+            return chosen_mode
+
+        mode = choice_input()
+        if mode == "1":
+            import pandas as pd
+            from ast import literal_eval
+            read_data = pd.read_csv("pronouns.csv", sep=";", quotechar="\\", encoding="windows-1251", header=0,
+                                    dtype={"word_number": int, "pronoun": str},
+                                    converters={"sentence": literal_eval, "variants": literal_eval})
+            chosen_data = [list(row) for row in read_data.values]
+        elif mode == "2":
+            chosen_data = dbworker(textworker())
+        else:
+            chosen_data = textworker()
+
+        return chosen_data
+
     def quantity_choicemaker(quantity_lines):
         try:
             chosen_quantity = int(input("\nВведіть бажану кількість питань. Наразі доступно: {}.\n".format(quantity_lines)))
@@ -158,6 +157,7 @@ def task_grading_executor(data_lines):
 
         return chosen_quantity
 
+    data_lines = data_choicemaker()
     quantity = quantity_choicemaker(len(data_lines))
 
     from random import sample, shuffle
