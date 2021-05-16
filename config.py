@@ -38,12 +38,11 @@ def textworker():
                 for parse in morph.parse(word):
                     if {"Fixd"} in parse.tag or parse.tag.POS != "NPRO":
                         continue
+                    elif parse.normalized.word.lower() in a1_ok and parse.tag.case != "ablt":
+                        p = parse
+                        break
                     else:
-                        if parse.normalized.word.lower() in a1_ok and parse.tag.case != "ablt":
-                            p = parse
-                            break
-                        else:
-                            continue
+                        continue
                 else:
                     continue
             except IndexError:
