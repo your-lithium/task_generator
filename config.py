@@ -38,7 +38,7 @@ def textworker():
                 for parse in morph.parse(word):
                     if {"Fixd"} in parse.tag or parse.tag.POS != "NPRO":
                         continue
-                    elif parse.normalized.word.lower() in a1_ok and parse.tag.case != "ablt":
+                    if parse.normalized.word.lower() in a1_ok and parse.tag.case != "ablt":
                         p = parse
                         break
                     else:
@@ -153,8 +153,8 @@ def task_grading_executor():
         try:
             chosen_quantity = int(
                 input("\nВведіть бажану кількість питань. Наразі доступно: {}.\n".format(quantity_lines)))
-            if chosen_quantity > len(data_lines):
-                chosen_quantity = len(data_lines)
+            if chosen_quantity > quantity_lines:
+                chosen_quantity = quantity_lines
                 print("На жаль, такої кількості питань не має в наявності. Буде надано: {}.\n".format(chosen_quantity))
             else:
                 return chosen_quantity
@@ -200,9 +200,6 @@ def task_grading_executor():
         variants.append(correct)
         shuffle(variants)
 
-        users = input(
-            "\n{}\nA)  {}\nБ)  {}\nВ)  {}\n".format(question, variants[0], variants[1], variants[2])).capitalize()
-
         correct_index = variants.index(correct)
         if correct_index == 0:
             correct_letter = "А"
@@ -210,6 +207,9 @@ def task_grading_executor():
             correct_letter = "Б"
         else:
             correct_letter = "В"
+
+        users = input(
+            "\n{}\nA)  {}\nБ)  {}\nВ)  {}\n".format(question, variants[0], variants[1], variants[2])).capitalize()
 
         if users not in "АБВ":
             print("Вибачте, ви ввели відповідь у некоректному форматі. Будь ласка, спробуйте ще раз.")
