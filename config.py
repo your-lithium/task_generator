@@ -41,8 +41,7 @@ def textworker():
                     if parse.normalized.word.lower() in a1_ok and parse.tag.case != "ablt":
                         p = parse
                         break
-                    else:
-                        continue
+                    continue
                 else:
                     continue
             except IndexError:
