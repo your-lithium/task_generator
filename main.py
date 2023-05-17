@@ -66,15 +66,15 @@ class SQL:
         return stems
 
     @staticmethod
-    def add_tasks(sample: list[str], sentences: dict[str, list[dict[str, str | int | dict[str, str | int] | None]]]) -> \
-            None:
-        """Завантажує новий користувацький набір вправ у БД"""
+    def add_tasks(sample: list[str], sentences: dict[str, list[dict[str, str | int | dict[str, str | int] | None]]]) \
+            -> None:
+        """Додає новий користувацький набір вправ у БД"""
 
         global con
         global cur
 
-        # cur.execute(f"""INSERT INTO set (name, description)
-        #                     VALUES {tuple(sample)}""")
+        cur.execute(f"""INSERT INTO set (name, description)
+                            VALUES {tuple(sample)}""")
 
         cur.execute("""SELECT seq
                        FROM sqlite_sequence
@@ -96,38 +96,59 @@ class SQL:
                                 WHERE name = 'sentence'""")
                 sentence_id = cur.fetchall()[0][0]
 
-                SQL.add_tokens(v)
+                SQL.add_tokens(v, sentence_id)
             finally:
                 cur.execute(f"""INSERT INTO sentence_set
                                 VALUES ('{sample_id}', '{sentence_id}')""")
+                con.commit()
 
     @staticmethod
-    def add_tokens(tokens: list[dict[str, str | int | dict[str, str | int] | None]]) -> None:
-        """Завантажує слова із речень у БД"""
+    def add_tokens(tokens: list[dict[str, str | int | dict[str, str | int] | None]], sentence_id: int) -> None:
+        """Додає слова із речень у БД"""
 
         for token in tokens:
             print()
             if token['form']:  # перевірка цільової частини мови
-                columns = list(token['properties'].keys())
-                values = list(token['properties'].values())
+                property_columns = list(token['properties'].keys())
+                property_values = list(token['properties'].values())
                 cur.execute(f"""SELECT {token['pos']}_id
                                 FROM {token['pos']}
                                 WHERE {token['form']} = '{token['text']}'
-                                    AND {' AND '.join(f'{column} = ?' for column in columns)}""", values)
+                                    AND {' AND '.join(f'{column} = ?' for column in property_columns)}""",
+                            property_values)
 
                 try:  # перевірка наявності леми у таблиці
                     pos_id = cur.fetchall()[0][0]
                 except IndexError:
-                    pos_id = SQL.add_pos(token['forms'], token['properties'])
+                    pos_id = SQL.add_pos(token['pos'], token['forms'], property_columns, property_values)
 
             else:
                 pos_id = None
 
-            # додати до таблиці
+            query = """INSERT INTO token (text, sentence_id, token_index, pos, pos_id, form)
+                            VALUES (?, ?, ?, ?, ?, ?)"""
+            values = (token['text'], sentence_id, token['token_index'], token['pos'], pos_id, token['form'])
+            cur.execute(query, values)
 
     @staticmethod
-    def add_pos(forms: dict[str, str], properties: dict[str, str | int]) -> int:
-        pass
+    def add_pos(pos: str, forms: dict[str, str], property_columns: list[str], property_values: list[str]) -> int:
+        """Додає нову лему у БД"""
+
+        form_columns = list(forms.keys())
+        form_values = list(forms.values())
+
+        columns = tuple(form_columns + property_columns)
+        values = tuple(form_values + property_values)
+
+        cur.execute(f"""INSERT INTO {pos} {columns}
+                        VALUES {values}""")
+
+        cur.execute(f"""SELECT seq
+                        FROM sqlite_sequence
+                        WHERE name = '{pos}'""")
+        pos_id = cur.fetchall()[0][0]
+
+        return pos_id
 
 
 class Word:
