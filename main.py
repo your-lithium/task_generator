@@ -5,6 +5,7 @@ import sqlite3
 import tkinter as tk
 import random
 from collections import defaultdict
+import re
 
 con = sqlite3.connect('tasks.db')
 cur = con.cursor()
@@ -20,13 +21,14 @@ class SQL:
         global con
         global cur
 
+        # отримати список словоформ потрібного рівня
         cur.execute(f"""SELECT *
                         FROM {pos}_level
                         WHERE level_id = {level}""")
         level_list = [[description[0] for description in cur.description[1:]][i]
                       for i, boolean in enumerate(cur.fetchall()[0][1:]) if boolean == 1]
-        # print(level_list)
 
+        # отримати список цільових слів за частиною мови та рівнем
         cur.execute(f"""SELECT text, sentence_id, token_index, pos_id, {", ".join(level_list)}
                         FROM token
                         INNER JOIN {pos}
@@ -38,8 +40,8 @@ class SQL:
                                 WHERE set_id = {set_number})
                             AND form IN {tuple(level_list)}""")
         corrects_list = [list(row) for row in cur.fetchall()]
-        # print(corrects_list)
 
+        # отримати список стрижнів для цільових слів
         cur.execute(f"""SELECT text, sentence_id, token_index
                         FROM token
                         WHERE pos != '{pos}'
@@ -52,8 +54,8 @@ class SQL:
                                         FROM sentence_set
                                         WHERE set_id = {set_number}))""")
         stems_list = [list(row) for row in cur.fetchall()]
-        # print(stems_list)
 
+        # почистити стрижні-дублікати
         stems = defaultdict(list)
         stems_numbers = set([correct[1] for correct in corrects_list])
         for i in stems_numbers:
@@ -61,7 +63,6 @@ class SQL:
             if len(stems[i]) > 1:
                 stems[i] = random.sample(stems[i], 1)
             stems[i].append([j for j in stems_list if j[1] == i])
-        # print(stems)
 
         return stems
 
@@ -73,21 +74,25 @@ class SQL:
         global con
         global cur
 
+        # вставити дані про новий набір вправ
         cur.execute(f"""INSERT INTO set (name, description)
                             VALUES {tuple(sample)}""")
-
         cur.execute("""SELECT seq
                        FROM sqlite_sequence
                        WHERE name = 'set'""")
         sample_id = cur.fetchall()[0][0]
-        # print(sample_id)
 
+        # вставити дані про речення набору
         for k, v in sentences.items():
+
+            # перевірити, чи речення вже є у БД
             cur.execute(f"""SELECT sentence_id
                             FROM sentence
                             WHERE text = '{k}'""")
             try:
                 sentence_id = cur.fetchall()[0][0]
+
+            # речення нема у БД: додати його і дані про його токени
             except IndexError:
                 cur.execute(f"""INSERT INTO sentence (text)
                                 VALUES ('{k}')""")
@@ -97,6 +102,8 @@ class SQL:
                 sentence_id = cur.fetchall()[0][0]
 
                 SQL.add_tokens(v, sentence_id)
+
+            # прив'язати речення до набору
             finally:
                 cur.execute(f"""INSERT INTO sentence_set
                                 VALUES ('{sample_id}', '{sentence_id}')""")
@@ -107,8 +114,9 @@ class SQL:
         """Додає слова із речень у БД"""
 
         for token in tokens:
-            print()
-            if token['form']:  # перевірка цільової частини мови
+
+            # перевірити, чи цільова частина мови (має вказану форму)
+            if token['form']:
                 property_columns = list(token['properties'].keys())
                 property_values = list(token['properties'].values())
                 cur.execute(f"""SELECT {token['pos']}_id
@@ -117,14 +125,19 @@ class SQL:
                                     AND {' AND '.join(f'{column} = ?' for column in property_columns)}""",
                             property_values)
 
-                try:  # перевірка наявності леми у таблиці
+                # перевірити наявність леми у таблиці
+                try:
                     pos_id = cur.fetchall()[0][0]
+
+                # леми нема у БД: додати її
                 except IndexError:
                     pos_id = SQL.add_pos(token['pos'], token['forms'], property_columns, property_values)
 
+            # нецільова частина мови: не прив'язувати до таблиці
             else:
                 pos_id = None
 
+            # вставити токени у таблицю
             query = """INSERT INTO token (text, sentence_id, token_index, pos, pos_id, form)
                             VALUES (?, ?, ?, ?, ?, ?)"""
             values = (token['text'], sentence_id, token['token_index'], token['pos'], pos_id, token['form'])
@@ -134,15 +147,15 @@ class SQL:
     def add_pos(pos: str, forms: dict[str, str], property_columns: list[str], property_values: list[str]) -> int:
         """Додає нову лему у БД"""
 
+        # отримати список колонок і значень форм і граматичних категорій
         form_columns = list(forms.keys())
         form_values = list(forms.values())
-
         columns = tuple(form_columns + property_columns)
         values = tuple(form_values + property_values)
 
+        # вставити дані про леми у таблицю
         cur.execute(f"""INSERT INTO {pos} {columns}
                         VALUES {values}""")
-
         cur.execute(f"""SELECT seq
                         FROM sqlite_sequence
                         WHERE name = '{pos}'""")
@@ -152,22 +165,55 @@ class SQL:
 
 
 class Word:
-    """"""
+    """Обробляє слова із користувацького тексту"""
 
 
 class Pronoun(Word):
-    """"""
+    """Обробляє займенники із користувацького тексту"""
 
 
 class Sentence:
-    """"""
+    """Обробляє речення із користувацького тексту"""
 
 
 class Text:
-    """"""
+    """Обробляє користувацький текст"""
 
-    def __init__(self, file_name: str):
-        pass
+    def __init__(self, file_path: str):
+        self.text = None
+        self.read_text(file_path)
+
+    def read_text(self, file_path: str) -> None:
+        """Зчитує текст із файлу"""
+        with open(file_path, encoding="windows-1251") as file:
+            self.text = file.read()
+
+    @staticmethod
+    def clean_text(self) -> None:
+        """Уніфіковує апострофи та лапки у тексті"""
+
+        single_quotes = ['`', '‘', '❮', '❯', '‚', '‛', '❛', '❜', '❟', 'ߵ', '´', 'ˊ', '｀', 'ʼ', 'ߴ', '՚', '＇', 'ʹ', 'ʻ',
+                         'ʽ', 'ʾ', 'ˈ', '′', '‵', "'"]
+        double_quotes = ['„', '⹂', '‟', '“', '”', '❝', '❞', '〝', '〞', '〟', '＂', 'ˮ', '‶', '"']
+
+        for i in single_quotes:
+            # знайти та замінити апострофи (між літерами)
+            self.text = re.sub(f"(?<=[А-ЩЬЮЯҐЄІЇа-щьюяґєії]){i}(?=[А-ЩЬЮЯҐЄІЇа-щьюяґєії])", '’', self.text)
+
+            # знайти та замінити ліві одинарні лапки
+            self.text = re.sub(fr"(?<=\W){i}(?=\S)", '‹', self.text)
+
+            # знайти та замінити праві одинарні лапки
+            self.text = re.sub(fr"(?<=\S){i}(?=\W)", '›', self.text)
+
+        for i in double_quotes:
+            # знайти та замінити ліві подвійні лапки
+            self.text = re.sub(fr"{i}(?=\S)", '«', self.text)
+
+            # знайти та замінити праві подвійні лапки
+            self.text = re.sub(fr"(?<=\S){i}", '»', self.text)
+
+
 
 
 class Body(tk.Frame):
