@@ -6,6 +6,7 @@ import tkinter as tk
 import random
 from collections import defaultdict
 import re
+import pymorphy3
 
 con = sqlite3.connect('tasks.db')
 cur = con.cursor()
@@ -67,7 +68,7 @@ class SQL:
         return stems
 
     @staticmethod
-    def add_tasks(sample: list[str], sentences: dict[str, list[dict[str, str | int | dict[str, str | int] | None]]]) \
+    def add_tasks(task_set: list[str], sentences: dict[str, list[dict[str, str | int | dict[str, str | int] | None]]]) \
             -> None:
         """Додає новий користувацький набір вправ у БД"""
 
@@ -76,11 +77,11 @@ class SQL:
 
         # вставити дані про новий набір вправ
         cur.execute(f"""INSERT INTO set (name, description)
-                            VALUES {tuple(sample)}""")
+                            VALUES {tuple(task_set)}""")
         cur.execute("""SELECT seq
                        FROM sqlite_sequence
                        WHERE name = 'set'""")
-        sample_id = cur.fetchall()[0][0]
+        set_id = cur.fetchall()[0][0]
 
         # вставити дані про речення набору
         for k, v in sentences.items():
@@ -106,7 +107,7 @@ class SQL:
             # прив'язати речення до набору
             finally:
                 cur.execute(f"""INSERT INTO sentence_set
-                                VALUES ('{sample_id}', '{sentence_id}')""")
+                                VALUES ('{set_id}', '{sentence_id}')""")
                 con.commit()
 
     @staticmethod
@@ -164,31 +165,67 @@ class SQL:
         return pos_id
 
 
-class Word:
+class Token:
     """Обробляє слова із користувацького тексту"""
 
+    def __init__(self, token_doc):
+        self.token_doc = token_doc
+        self.text = token_doc.text
+        self.index = token_doc.id - 1
+        self.pos = ''
+        self.form = None
+        self.forms = None
+        self.properties = None
 
-class Pronoun(Word):
+    def get_pos(self):
+        pass
+
+    def get_dict(self):
+        return {'text': self.text, 'token_index': self.index, 'pos': self.pos, 'form': self.form, 'forms': self.forms,
+                'properties': self.properties}
+
+
+class Pronoun(Token):
     """Обробляє займенники із користувацького тексту"""
 
 
 class Sentence:
     """Обробляє речення із користувацького тексту"""
 
+    def __init__(self, sentence_doc: stanza.models.common.doc.Sentence):
+        self.sentence_doc = sentence_doc
+        self.text = sentence_doc.text
+        self.tokens = None
+        self.analyse_tokens()
+
+    def analyse_tokens(self):
+        for token in self.sentence_doc.tokens:
+            self.tokens.append(Token(token).get_dict())
+
+    def get_dict(self):
+        return {self.text: self.tokens}
+
 
 class Text:
     """Обробляє користувацький текст"""
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str, task_set: list[str]):
+        self.set = task_set
         self.text = None
+        self.sentences = {}
         self.read_text(file_path)
+        self.clean_text()
+        nlp = stanza.Pipeline("uk")
+        self.doc = nlp(self.text)
+        global morph
+        morph = pymorphy3.MorphAnalyzer(lang='uk')
+        self.analyse_text()
 
     def read_text(self, file_path: str) -> None:
         """Зчитує текст із файлу"""
         with open(file_path, encoding="windows-1251") as file:
             self.text = file.read()
 
-    @staticmethod
     def clean_text(self) -> None:
         """Уніфіковує апострофи та лапки у тексті"""
 
@@ -213,7 +250,13 @@ class Text:
             # знайти та замінити праві подвійні лапки
             self.text = re.sub(fr"(?<=\S){i}", '»', self.text)
 
+    def analyse_text(self) -> None:
+        """Ініціює поділ на речення, подальший аналіз токенів і їхній запис у БД"""
 
+        for sentence_doc in self.doc.sentences:
+            self.sentences.update(Sentence(sentence_doc).get_dict())
+
+        SQL.add_tasks(self.set, self.sentences)
 
 
 class Body(tk.Frame):
@@ -227,7 +270,6 @@ class Application(tk.Tk):
 if __name__ == '__main__':
     con = sqlite3.connect('tasks.db')
     cur = con.cursor()
-    # nlp = stanza.Pipeline("uk")
     app = Application()
     app.mainloop()
     con.close()
