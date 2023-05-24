@@ -184,13 +184,17 @@ class SQL:
 
             # перевірити, чи цільова частина мови (має вказану форму)
             if token['form']:
-                property_columns = list(token['features'].keys())
-                property_values = list(token['features'].values())
-                cur.execute(f"""SELECT {token['pos']}_id
-                                FROM {token['pos']}
-                                WHERE {token['form']} = '{token['text'].lower()}'
-                                    AND {' AND '.join(f'{column} = ?' for column in property_columns)}""",
-                            property_values)
+                query = f"""SELECT {token['pos']}_id
+                            FROM {token['pos']}
+                            WHERE {token['form']} = '{token['text'].lower()}'
+                                AND """
+                for k, v in token['features'].items():
+                    if v:
+                        query += f"{k} = '{v}' AND "
+                    else:
+                        query += f"{k} IS NULL AND "
+                query = query[:-5]
+                cur.execute(query)
 
                 # перевірити наявність леми у таблиці
                 try:
@@ -198,7 +202,7 @@ class SQL:
 
                 # леми нема у БД: додати її
                 except IndexError:
-                    pos_id = SQL.add_pos(token['pos'], token['forms'], property_columns, property_values)
+                    pos_id = SQL.add_pos(token['pos'], token['forms'], token['features'])
 
             # нецільова частина мови: не прив'язувати до таблиці
             else:
@@ -211,14 +215,16 @@ class SQL:
             cur.execute(query, values)
 
     @staticmethod
-    def add_pos(pos: str, forms: dict[str, str], property_columns: list[str], property_values: list[str]) -> int:
+    def add_pos(pos: str, forms: dict[str, str], features: dict[str, str]) -> int:
         """Додає нову лему у БД"""
 
         # отримати список колонок і значень форм і граматичних категорій
+        feature_columns = list(features.keys())
+        feature_values = list(features.values())
         form_columns = list(forms.keys())
         form_values = list(forms.values())
-        columns = tuple(form_columns + property_columns)
-        values = tuple(form_values + property_values)
+        columns = tuple(form_columns + feature_columns)
+        values = tuple(form_values + feature_values)
 
         # вставити дані про леми у таблицю
         cur.execute(f"""INSERT INTO {pos} {columns}
