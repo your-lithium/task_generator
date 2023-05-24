@@ -11,6 +11,72 @@ import pymorphy3
 con = sqlite3.connect('tasks.db')
 cur = con.cursor()
 
+# узгодження позначень частин мови stanza і pymorphy з позначеннями БД
+pos_name_mapping = {'ADJ': 'adjective',
+                    'ADP': 'adposition',
+                    'ADV': 'adverb',
+                    'AUX': 'verb',
+                    'CCONJ': 'conjunction',
+                    'DET': 'determiner',
+                    'INTJ': 'interjection',
+                    'NOUN': 'noun',
+                    'NUM': 'number',
+                    'PART': 'particle',
+                    'PRON': 'pronoun',
+                    'PROPN': 'noun',
+                    'PUNCT': 'punct',
+                    'SCONJ': 'conjunction',
+                    'SYM': 'symbol',
+                    'VERB': 'verb',
+                    'X': 'foreign',
+                    'ADJF': 'adjective',
+                    'ADJS': 'adjective',
+                    'COMP': 'adverb',
+                    'INFN': 'verb',
+                    'PRTF': 'adjective',
+                    'PRTS': 'adjective',
+                    'GRND': 'verb',
+                    'NUMR': 'number',
+                    'ADVB': 'adverb',
+                    'NPRO': 'pronoun',
+                    'PRED': 'adverb',
+                    'PREP': 'adposition',
+                    'CONJ': 'conjunction',
+                    'PRCL': 'particle'
+                    }
+
+# узгодження позначень морфологічних категорій pymorphy3 i stanza з позначеннями БД
+gender_mapping = {'Masc': 'masculine',
+                  'masc': 'masculine',
+                  'Fem': 'feminine',
+                  'femn': 'feminine',
+                  'Neut': 'neutral',
+                  'neut': 'neutral'}
+number_mapping = {'Sing': 'singular',
+                  'sing': 'singular',
+                  'Plur': 'plural',
+                  'plur': 'plural'}
+person_mapping = {'1': 1,
+                  '1per': 1,
+                  '2': 2,
+                  '2per': 2,
+                  '3': 3,
+                  '3per': 3}
+
+# узгодження позначень відмінків pymorphy3 з позначеннями БД і stanza
+case_mapping = {'nomn': 'nom',
+                'gent': 'gen',
+                'datv': 'dat',
+                'accs': 'acc',
+                'ablt': 'ins',
+                'loct': 'loc',
+                'voct': 'voc',
+                'gen2': 'gen',
+                'acc2': 'acc',
+                'loc2': 'loc'}
+
+morph = pymorphy3.MorphAnalyzer(lang='uk')
+
 
 class SQL:
     """Містить SQL-запити та методи створення БД вправ."""
@@ -76,7 +142,7 @@ class SQL:
         global cur
 
         # вставити дані про новий набір вправ
-        cur.execute(f"""INSERT INTO set (name, description)
+        cur.execute(f"""INSERT INTO "set" (name, description)
                             VALUES {tuple(task_set)}""")
         cur.execute("""SELECT seq
                        FROM sqlite_sequence
@@ -118,11 +184,11 @@ class SQL:
 
             # перевірити, чи цільова частина мови (має вказану форму)
             if token['form']:
-                property_columns = list(token['properties'].keys())
-                property_values = list(token['properties'].values())
+                property_columns = list(token['features'].keys())
+                property_values = list(token['features'].values())
                 cur.execute(f"""SELECT {token['pos']}_id
                                 FROM {token['pos']}
-                                WHERE {token['form']} = '{token['text']}'
+                                WHERE {token['form']} = '{token['text'].lower()}'
                                     AND {' AND '.join(f'{column} = ?' for column in property_columns)}""",
                             property_values)
 
@@ -156,7 +222,7 @@ class SQL:
 
         # вставити дані про леми у таблицю
         cur.execute(f"""INSERT INTO {pos} {columns}
-                        VALUES {values}""")
+                        VALUES {values}""".replace('None', 'NULL'))
         cur.execute(f"""SELECT seq
                         FROM sqlite_sequence
                         WHERE name = '{pos}'""")
@@ -172,42 +238,158 @@ class Token:
         self.token_doc = token_doc
         self.text = token_doc.text
         self.index = token_doc.id - 1
-        self.pos = ''
+        self.pos = None
+        self.get_pos()
         self.form = None
+        self.get_form()
         self.forms = None
-        self.properties = None
+        self.get_forms()
+        self.features = None
+        self.get_features()
 
     def get_pos(self):
+        self.pos = pos_name_mapping[self.token_doc.upos]
+
+    def get_form(self):
+        pass
+
+    def get_forms(self):
+        pass
+
+    def get_features(self):
         pass
 
     def get_dict(self):
         return {'text': self.text, 'token_index': self.index, 'pos': self.pos, 'form': self.form, 'forms': self.forms,
-                'properties': self.properties}
+                'features': self.features}
 
 
 class Pronoun(Token):
     """Обробляє займенники із користувацького тексту"""
 
+    def __init__(self, token_doc):
+        self.doc_forms = {}
+        self.doc_features = {key: value for [key, value] in [pair.split('=')
+                                                             for pair in token_doc.feats.split('|')]}
+        super().__init__(token_doc)
 
-class Sentence:
-    """Обробляє речення із користувацького тексту"""
+    def get_pos(self):
+        self.pos = 'pronoun'
 
-    def __init__(self, sentence_doc: stanza.models.common.doc.Sentence):
-        self.sentence_doc = sentence_doc
-        self.text = sentence_doc.text
-        self.tokens = None
-        self.analyse_tokens()
+    def get_form(self):
+        self.form = self.doc_features['Case'].lower()
 
-    def analyse_tokens(self):
-        for token in self.sentence_doc.tokens:
-            self.tokens.append(Token(token).get_dict())
+    def get_forms(self):
+        lemmas = morph.parse(self.text)
+        for i in lemmas:
+            if pos_name_mapping[i.tag.POS] == self.pos and case_mapping[i.tag.case] == self.form:
+                lemma = i
+                break
+            else:
+                lemma = lemmas[0]
+
+        self.forms = {'nom': lemma.inflect({'nomn'}).word,
+                      'gen': lemma.inflect({'gent'}).word,
+                      'dat': lemma.inflect({'datv'}).word,
+                      'acc': lemma.inflect({'accs'}).word,
+                      'ins': lemma.inflect({'ablt'}).word,
+                      'loc': lemma.inflect({'loct'}).word}
+
+    def get_features(self):
+        try:
+            gender = gender_mapping[self.doc_features['Gender']]
+        except KeyError:
+            gender = None
+
+        try:
+            number = number_mapping[self.doc_features['Number']]
+        except KeyError:
+            number = None
+
+        try:
+            person = person_mapping[self.doc_features['Person']]
+        except KeyError:
+            person = None
+
+        self.features = {'gender': gender, 'number': number, 'person': person}
 
     def get_dict(self):
-        return {self.text: self.tokens}
+        return super().get_dict()
+
+
+class Noun(Token):
+    """Обробляє іменники із користувацького тексту"""
+
+    def __init__(self, token_doc):
+        self.doc_forms = {}
+        self.doc_features = {key: value for [key, value] in [pair.split('=')
+                                                             for pair in token_doc.feats.split('|')]}
+        super().__init__(token_doc)
+
+    def get_pos(self):
+        self.pos = 'noun'
+
+    def get_form(self):
+        self.form = self.doc_features['Case'].lower()
+        self.form += '_s' if self.doc_features['Number'] == 'Sing' else '_p'
+
+    def get_forms(self):
+        lemmas = morph.parse(self.text)
+        for i in lemmas:
+            if pos_name_mapping[i.tag.POS] == self.pos \
+                    and (case_mapping.get(i.tag.case) is not None and case_mapping.get(i.tag.case) in self.form) or (i.tag.case is None and self.form == 'nom_s') \
+                    and {'Pltm'} not in i.tag:
+                lemma = i.normalized
+                break
+            else:
+                lemma = lemmas[0].normalized
+
+
+        self.forms = {'nom_s': lemma.inflect({'nomn'}).word,
+                      'gen_s': lemma.inflect({'gent'}).word,
+                      'dat_s': lemma.inflect({'datv'}).word,
+                      'acc_s': lemma.inflect({'accs'}).word,
+                      'ins_s': lemma.inflect({'ablt'}).word,
+                      'loc_s': lemma.inflect({'loct'}).word,
+                      'voc_s': lemma.inflect({'voct'}).word,
+                      'nom_p': lemma.inflect({'plur', 'nomn'}).word,
+                      'gen_p': lemma.inflect({'plur', 'gent'}).word,
+                      'dat_p': lemma.inflect({'plur', 'datv'}).word,
+                      'acc_p': lemma.inflect({'plur', 'accs'}).word,
+                      'ins_p': lemma.inflect({'plur', 'ablt'}).word,
+                      'loc_p': lemma.inflect({'plur', 'loct'}).word,
+                      'voc_p': lemma.inflect({'plur', 'voct'}).word}
+
+    def get_features(self):
+        try:
+            gender = gender_mapping[self.doc_features['Gender']]
+        except KeyError:
+            gender = None
+
+        self.features = {'gender': gender}
+
+    def get_dict(self):
+        return super().get_dict()
+
+
+class Pluralia(Token):
+    """Обробляє pluralia tantum із користувацького тексту"""
+
+    def __init__(self, token_doc):
+        super().__init__(token_doc)
+
+    def get_pos(self):
+        self.pos = 'pluralia'
+
+    def get_dict(self):
+        return super().get_dict()
 
 
 class Text:
     """Обробляє користувацький текст"""
+
+    pos_class_mapping = {'PRON': Pronoun,
+                         'NOUN': Noun}
 
     def __init__(self, file_path: str, task_set: list[str]):
         self.set = task_set
@@ -217,8 +399,6 @@ class Text:
         self.clean_text()
         nlp = stanza.Pipeline("uk")
         self.doc = nlp(self.text)
-        global morph
-        morph = pymorphy3.MorphAnalyzer(lang='uk')
         self.analyse_text()
 
     def read_text(self, file_path: str) -> None:
@@ -257,6 +437,30 @@ class Text:
             self.sentences.update(Sentence(sentence_doc).get_dict())
 
         SQL.add_tasks(self.set, self.sentences)
+        con.commit()
+
+
+class Sentence(Text):
+    """Обробляє речення із користувацького тексту"""
+
+    def __init__(self, sentence_doc: stanza.models.common.doc.Sentence):
+        self.sentence_doc = sentence_doc
+        self.text = sentence_doc.text
+        self.tokens = []
+        self.analyse_tokens()
+
+    def analyse_tokens(self):
+        for token in self.sentence_doc.words:
+            if token.upos in self.pos_class_mapping and 'Ptan' not in token.feats:
+                token_instance = self.pos_class_mapping[token.upos](token)
+                self.tokens.append(token_instance.get_dict())
+            elif token.feats and 'Ptan' in token.feats:
+                self.tokens.append(Pluralia(token).get_dict())
+            else:
+                self.tokens.append(Token(token).get_dict())
+
+    def get_dict(self):
+        return {self.text: self.tokens}
 
 
 class Body(tk.Frame):
