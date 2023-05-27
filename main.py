@@ -5,6 +5,7 @@ import sqlite3
 import tkinter as tk
 from tkinter import ttk
 import tkinter.filedialog as filedialog
+from tkinter import messagebox
 import random
 from collections import defaultdict
 import re
@@ -12,6 +13,11 @@ import pymorphy3
 
 con = sqlite3.connect('tasks.db')
 cur = con.cursor()
+
+
+# узгодження назв доступних частин мови в англійській та українській
+pos_ukrainian_mapping = {"noun": "іменник",
+                         "pronoun": "займенник"}
 
 # узгодження позначень частин мови stanza і pymorphy з позначеннями БД
 pos_name_mapping = {'ADJ': 'adjective',
@@ -237,6 +243,26 @@ class SQL:
         pos_id = cur.fetchall()[0][0]
 
         return pos_id
+
+    @staticmethod
+    def get_levels():
+        """Витягує список рівнів"""
+        cur.execute("SELECT level_id, name FROM level")
+        results = {}
+        for level_id, name in cur.fetchall():
+            results[name] = level_id
+        print(results)
+        return results
+
+    @staticmethod
+    def get_sets():
+        """Витягує список наборів вправ з описами"""
+        cur.execute("SELECT set_id, name, description FROM 'set'")
+        results = {}
+        for set_id, name, description in cur.fetchall():
+            results[name] = set_id, description
+        print(results)
+        return results
 
 
 class Token:
@@ -478,6 +504,12 @@ class Body(tk.Frame):
         super().__init__(master, *args, **kwargs)
 
         # визначити параметри шрифтів
+        self.set_values = None
+        self.level_values = None
+        self.tasks = None
+        self.set_dropdown = None
+        self.pos_dropdown = None
+        self.level_dropdown = None
         self.name_entry = None
         self.description_entry = None
         self.file_path = None
@@ -490,6 +522,10 @@ class Body(tk.Frame):
 
     def starting_screen(self):
         """Створює початковий екран"""
+
+        # очистити вікно
+        for widget in self.winfo_children():
+            widget.destroy()
 
         # створити заголовок
         top_label_text = "Вітаємо у застосунку автоматичного укладання вправ\n" \
@@ -535,17 +571,63 @@ class Body(tk.Frame):
     def start_testing(self):
         """Запускає тестування"""
 
-        # очищує вікно
+        # очистити вікно
         for widget in self.winfo_children():
             widget.destroy()
+
+        # створити віджети
+        header_label = tk.Label(self, text="Оберіть параметри для подальшого тестування", font=self.font_head)
+        header_label.grid(row=0, column=0, sticky='w', pady=10)
+
+        level_label = tk.Label(self, text="Оберіть бажаний рівень для вправ:", font=self.font_label)
+        level_label.grid(row=1, column=0, sticky='w', pady=(0, 5))
+        self.level_values = SQL.get_levels()
+        self.level_dropdown = ttk.Combobox(self, values=list(self.level_values.keys()))
+        self.level_dropdown.grid(row=2, column=0, sticky='w', pady=(0, 10))
+
+        separator_line1 = ttk.Separator(self, orient=tk.HORIZONTAL)
+        separator_line1.grid(row=3, column=0, sticky="ew", pady=10)
+        self.grid_rowconfigure(3)
+
+        pos_label = tk.Label(self, text="Оберіть цільову частину мови:", font=self.font_label)
+        pos_label.grid(row=4, column=0, sticky='w', pady=(0, 5))
+        pos_values = list(pos_ukrainian_mapping.values())
+        self.pos_dropdown = ttk.Combobox(self, values=pos_values)
+        self.pos_dropdown.grid(row=5, column=0, sticky='w', pady=(0, 10))
+
+        separator_line2 = ttk.Separator(self, orient=tk.HORIZONTAL)
+        separator_line2.grid(row=6, column=0, sticky="ew", pady=10)
+        self.grid_rowconfigure(6)
+
+        set_label = tk.Label(self, text="Оберіть потрібний набір вправ:", font=self.font_label)
+        set_label.grid(row=7, column=0, sticky='w', pady=(0, 5))
+        self.set_values = SQL.get_sets()
+        self.set_dropdown = ttk.Combobox(self, values=list(self.set_values.keys()))
+        self.set_dropdown.grid(row=8, column=0, sticky='w', pady=(0, 10))
+
+        separator_line3 = ttk.Separator(self, orient=tk.HORIZONTAL)
+        separator_line3.grid(row=9, column=0, sticky="ew", pady=10)
+        self.grid_rowconfigure(9)
+
+        process_button = tk.Button(self, text="Завантажити вправи", command=self.get_tasks, font=self.font_button,
+                                   fg="white", bg="black")
+        process_button.grid(row=10, column=0, sticky='ew', pady=(0, 10))
+
+    def get_tasks(self):
+        selected_level = self.level_values.get(self.level_dropdown.get())
+        selected_pos = pos_ukrainian_mapping.get(self.pos_dropdown.get())
+        selected_set = self.level_values.get(self.set_dropdown.get())
+        print((selected_level, selected_pos, selected_set))
+        # self.tasks = SQL.choose_tasks()
 
     def upload_tasks(self):
         """Дозволяє завантажити свої тексти у БД"""
 
-        # очищує вікно
+        # очистити вікно
         for widget in self.winfo_children():
             widget.destroy()
 
+        # створити віджети
         header_label = tk.Label(self, text="Внесіть потрібні дані про новий набір вправ", font=self.font_head)
         header_label.grid(row=0, column=0, sticky='w', pady=10)
 
@@ -588,6 +670,8 @@ class Body(tk.Frame):
     def process_tasks(self):
         """Обробляє завантажені дані"""
         Text(self.file_path, [self.name_entry.get(), self.description_entry.get()])
+        messagebox.showinfo("Success", "Tasks processed successfully!")
+        self.starting_screen()
 
 
 class Application(tk.Tk):
