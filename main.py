@@ -3,6 +3,7 @@
 import stanza
 import sqlite3
 import tkinter as tk
+from tkinter import ttk
 import random
 from collections import defaultdict
 import re
@@ -470,16 +471,67 @@ class Sentence(Text):
 
 
 class Body(tk.Frame):
-    """"""
+    """Формує тіло інтерфейсу"""
+
+    def __init__(self, master, *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+
+        # визначити параметри шрифтів
+        font_head = ("Helvetica", 12, "bold")
+        font_label = ("Helvetica", 12)
+        font_button = ("Helvetica", 10)
+
+        # створити заголовок
+        top_label_text = "Вітаємо у застосунку автоматичного укладання вправ\n" \
+                         "із граматики української мови як іноземної!"
+        top_label = tk.Label(self, text=top_label_text, font=font_head)
+        top_label.grid(row=0, column=0, columnspan=3, pady=10)
+
+        # створити розділювачі
+        separator_line = ttk.Separator(self, orient=tk.HORIZONTAL)
+        separator_line.grid(row=1, column=0, columnspan=3, sticky="ew", pady=10)
+        separator_vertical = ttk.Separator(self, orient=tk.VERTICAL)
+        separator_vertical.grid(row=2, column=1, rowspan=2, sticky="ns", padx=10)
+
+        # створити ліву секцію
+        left_section = tk.Frame(self)
+        left_section.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
+
+        left_label_text = "Розпочніть тестування \nіз наявними вправами"
+        left_label = tk.Label(left_section, text=left_label_text, font=font_label, wraplength=200, justify=tk.CENTER)
+        left_label.pack(pady=(20, 5), padx=10, anchor="center")
+
+        left_button = tk.Button(left_section, text="Розпочати", font=font_button)
+        left_button.pack(pady=(5, 20), padx=10, anchor="center")
+
+        # створити праву секцію
+        right_section = tk.Frame(self)
+        right_section.grid(row=2, column=2, padx=10, pady=10, sticky="nsew")
+
+        right_label_text = "Створіть нові вправи\nіз своїх текстів"
+        right_label = tk.Label(right_section, text=right_label_text, font=font_label, wraplength=200, justify=tk.CENTER)
+        right_label.pack(pady=(20, 5), padx=10, anchor="center")
+
+        right_button = tk.Button(right_section, text="Створити", font=font_button)
+        right_button.pack(pady=(5, 20), padx=10, anchor="center")
+
+        # здійснити конфігурацію колонок
+        self.grid_columnconfigure(1)
 
 
 class Application(tk.Tk):
-    """"""
+    """Представляє інтерфейс програми"""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.title("Вправи із граматики")
+        self.body = Body(self, padx=15, pady=15)
+        self.body.pack()
 
 
 if __name__ == '__main__':
-    con = sqlite3.connect('tasks.db')
-    cur = con.cursor()
+    # con = sqlite3.connect('tasks.db')
+    # cur = con.cursor()
     app = Application()
     app.mainloop()
-    con.close()
+    # con.close()
