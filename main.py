@@ -4,6 +4,7 @@ import stanza
 import sqlite3
 import tkinter as tk
 from tkinter import ttk
+import tkinter.filedialog as filedialog
 import random
 from collections import defaultdict
 import re
@@ -344,13 +345,13 @@ class Noun(Token):
         lemmas = morph.parse(self.text)
         for i in lemmas:
             if pos_name_mapping[i.tag.POS] == self.pos \
-                    and (case_mapping.get(i.tag.case) is not None and case_mapping.get(i.tag.case) in self.form) or (i.tag.case is None and self.form == 'nom_s') \
+                    and (case_mapping.get(i.tag.case) is not None and case_mapping.get(i.tag.case) in self.form) or (
+                    i.tag.case is None and self.form == 'nom_s') \
                     and {'Pltm'} not in i.tag:
                 lemma = i.normalized
                 break
             else:
                 lemma = lemmas[0].normalized
-
 
         self.forms = {'nom_s': lemma.inflect({'nomn'}).word,
                       'gen_s': lemma.inflect({'gent'}).word,
@@ -477,14 +478,23 @@ class Body(tk.Frame):
         super().__init__(master, *args, **kwargs)
 
         # визначити параметри шрифтів
-        font_head = ("Helvetica", 12, "bold")
-        font_label = ("Helvetica", 12)
-        font_button = ("Helvetica", 10)
+        self.name_entry = None
+        self.description_entry = None
+        self.file_path = None
+        self.font_head = ("Helvetica", 12, "bold")
+        self.font_label = ("Helvetica", 12)
+        self.font_button = ("Helvetica", 10)
+
+        # запустити початковий екран
+        self.starting_screen()
+
+    def starting_screen(self):
+        """Створює початковий екран"""
 
         # створити заголовок
         top_label_text = "Вітаємо у застосунку автоматичного укладання вправ\n" \
                          "із граматики української мови як іноземної!"
-        top_label = tk.Label(self, text=top_label_text, font=font_head)
+        top_label = tk.Label(self, text=top_label_text, font=self.font_head)
         top_label.grid(row=0, column=0, columnspan=3, pady=10)
 
         # створити розділювачі
@@ -498,25 +508,86 @@ class Body(tk.Frame):
         left_section.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
 
         left_label_text = "Розпочніть тестування \nіз наявними вправами"
-        left_label = tk.Label(left_section, text=left_label_text, font=font_label, wraplength=200, justify=tk.CENTER)
+        left_label = tk.Label(left_section, text=left_label_text, font=self.font_label, wraplength=200,
+                              justify=tk.CENTER)
         left_label.pack(pady=(20, 5), padx=10, anchor="center")
 
-        left_button = tk.Button(left_section, text="Розпочати", font=font_button)
+        left_button = tk.Button(left_section, text="Розпочати", font=self.font_button, fg="white", bg="black")
         left_button.pack(pady=(5, 20), padx=10, anchor="center")
+        left_button.configure(command=self.start_testing)
 
         # створити праву секцію
         right_section = tk.Frame(self)
         right_section.grid(row=2, column=2, padx=10, pady=10, sticky="nsew")
 
         right_label_text = "Створіть нові вправи\nіз своїх текстів"
-        right_label = tk.Label(right_section, text=right_label_text, font=font_label, wraplength=200, justify=tk.CENTER)
+        right_label = tk.Label(right_section, text=right_label_text, font=self.font_label, wraplength=200,
+                               justify=tk.CENTER)
         right_label.pack(pady=(20, 5), padx=10, anchor="center")
 
-        right_button = tk.Button(right_section, text="Створити", font=font_button)
+        right_button = tk.Button(right_section, text="Створити", font=self.font_button, fg="white", bg="black")
         right_button.pack(pady=(5, 20), padx=10, anchor="center")
+        right_button.configure(command=self.upload_tasks)
 
         # здійснити конфігурацію колонок
         self.grid_columnconfigure(1)
+
+    def start_testing(self):
+        """Запускає тестування"""
+
+        # очищує вікно
+        for widget in self.winfo_children():
+            widget.destroy()
+
+    def upload_tasks(self):
+        """Дозволяє завантажити свої тексти у БД"""
+
+        # очищує вікно
+        for widget in self.winfo_children():
+            widget.destroy()
+
+        header_label = tk.Label(self, text="Внесіть потрібні дані про новий набір вправ", font=self.font_head)
+        header_label.grid(row=0, column=0, sticky='w', pady=10)
+
+        name_label = tk.Label(self, text="Введіть бажану назву набору:", font=self.font_label)
+        name_label.grid(row=1, column=0, sticky='w', pady=(0, 5))
+        self.name_entry = tk.Entry(self, font=self.font_label)
+        self.name_entry.grid(row=2, column=0, sticky='w', pady=(0, 10))
+
+        separator_line1 = ttk.Separator(self, orient=tk.HORIZONTAL)
+        separator_line1.grid(row=3, column=0, sticky="ew", pady=10)
+        self.grid_rowconfigure(3)
+
+        description_label = tk.Label(self, text="Введіть опис нового набору:", font=self.font_label)
+        description_label.grid(row=4, column=0, sticky='w', pady=(0, 5))
+        self.description_entry = tk.Entry(self, font=self.font_label)
+        self.description_entry.grid(row=5, column=0, columnspan=2, sticky='ew', pady=(0, 10))
+
+        separator_line2 = ttk.Separator(self, orient=tk.HORIZONTAL)
+        separator_line2.grid(row=6, column=0, sticky="ew", pady=10)
+        self.grid_rowconfigure(6)
+
+        file_label = tk.Label(self, text="Оберіть файл із вашим текстом:", font=self.font_label)
+        file_label.grid(row=7, column=0, sticky='w', pady=(0, 5))
+        file_button = tk.Button(self, text="Вибрати файл", command=self.choose_file, font=self.font_button, fg="white",
+                                bg="black")
+        file_button.grid(row=8, column=0, sticky='w', pady=(0, 10))
+
+        separator_line3 = ttk.Separator(self, orient=tk.HORIZONTAL)
+        separator_line3.grid(row=9, column=0, sticky="ew", pady=10)
+        self.grid_rowconfigure(9)
+
+        process_button = tk.Button(self, text="Завантажити вправи", command=self.process_tasks, font=self.font_button,
+                                   fg="white", bg="black")
+        process_button.grid(row=10, column=0, sticky='ew', pady=(0, 10))
+
+    def choose_file(self):
+        """Дозволяє отримати шлях до файлу із текстом для вправ"""
+        self.file_path = filedialog.askopenfilename()
+
+    def process_tasks(self):
+        """Обробляє завантажені дані"""
+        Text(self.file_path, [self.name_entry.get(), self.description_entry.get()])
 
 
 class Application(tk.Tk):
