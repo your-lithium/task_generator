@@ -11,7 +11,6 @@ from collections import defaultdict
 import re
 import pymorphy3
 
-
 # узгодження назв доступних частин мови в англійській та українській
 pos_ukrainian_mapping = {"іменник": "noun",
                          "займенник": "pronoun"}
@@ -80,14 +79,12 @@ case_mapping = {'nomn': 'nom',
                 'acc2': 'acc',
                 'loc2': 'loc'}
 
-morph = pymorphy3.MorphAnalyzer(lang='uk')
-
 
 class SQL:
     """Містить SQL-запити та методи створення БД вправ."""
 
     @staticmethod
-    def choose_tasks(level: int, pos: str, set_number: int) -> dict[int, list]:
+    def choose_tasks(level: int, pos: str, set_number: int) -> list[list]:
         """Створює список вправ, які підходять під вимоги користувача"""
 
         global con
@@ -101,7 +98,7 @@ class SQL:
                       for i, boolean in enumerate(cur.fetchall()[0][1:]) if boolean == 1]
 
         # отримати список цільових слів за частиною мови та рівнем
-        cur.execute(f"""SELECT 'text', sentence_id, token_index, pos_id, {", ".join(level_list)}
+        cur.execute(f"""SELECT text, sentence_id, token_index, {", ".join(level_list)}
                         FROM token
                         INNER JOIN {pos}
                             ON token.pos_id = {pos}.{pos}_id
@@ -130,12 +127,16 @@ class SQL:
         # почистити стрижні-дублікати
         stems = defaultdict(list)
         stems_numbers = set([correct[1] for correct in corrects_list])
-        for i in stems_numbers:
-            stems[i] = [j for j in corrects_list if j[1] == i]
-            if len(stems[i]) > 1:
-                stems[i] = random.sample(stems[i], 1)
-            stems[i].append([j for j in stems_list if j[1] == i])
+        for sent_id in stems_numbers:
+            stems[sent_id] = [correct[:1] + correct[2:] for correct in corrects_list if correct[1] == sent_id]
+            if len(stems[sent_id]) > 1:
+                selected = random.sample(stems[sent_id], 1)
+                rejected = [item[:1] + item[1:2] for item in stems[sent_id] if item != selected[0]]
+                stems[sent_id] = selected
+                stems[sent_id].extend(rejected)
+            stems[sent_id].extend([item[:1] + item[2:] for item in stems_list if item[1] == sent_id])
 
+        stems = list(stems.values())
         return stems
 
     @staticmethod
@@ -499,6 +500,8 @@ class Body(tk.Frame):
         super().__init__(master, *args, **kwargs)
 
         # визначити параметри шрифтів
+        self.selected_value = None
+        self.quantity_entry = None
         self.set_values = None
         self.level_values = None
         self.tasks = None
@@ -545,7 +548,7 @@ class Body(tk.Frame):
 
         left_button = tk.Button(left_section, text="Розпочати", font=self.font_button, fg="white", bg="black")
         left_button.pack(pady=(5, 20), padx=10, anchor="center")
-        left_button.configure(command=self.start_testing)
+        left_button.configure(command=self.configure_testing)
 
         # створити праву секцію
         right_section = tk.Frame(self)
@@ -563,7 +566,7 @@ class Body(tk.Frame):
         # здійснити конфігурацію колонок
         self.grid_columnconfigure(1)
 
-    def start_testing(self):
+    def configure_testing(self):
         """Запускає тестування"""
 
         # очистити вікно
@@ -611,7 +614,7 @@ class Body(tk.Frame):
     def get_tasks(self):
         """Обирає із БД потрібні вправи"""
 
-        # отримати дані про обрані вправи і завантажити їх
+        # отримати дані про обрані вправи та завантажити їх
         selected_level = self.level_values.get(self.level_dropdown.get())
         selected_pos = pos_ukrainian_mapping.get(self.pos_dropdown.get())
         selected_set = self.set_values.get(self.set_dropdown.get())[0]
@@ -621,8 +624,98 @@ class Body(tk.Frame):
         for widget in self.winfo_children():
             widget.destroy()
 
-        #
-        messagebox.showinfo("Success", f"Доступно {len(self.tasks)} завдань.")
+        # створити віджети для вибору кількості вправ
+        header_label = tk.Label(self, text="Оберіть бажану кількість вправ для тестування", font=self.font_head)
+        header_label.grid(row=0, column=0, sticky='w', pady=10)
+
+        quantity_label = tk.Label(self, text=f"Доступно {len(self.tasks)} вправ.", font=self.font_label)
+        quantity_label.grid(row=1, column=0, sticky='w', pady=(0, 5))
+        self.quantity_entry = tk.Spinbox(self, from_=1, to=len(self.tasks), font=self.font_label)
+        self.quantity_entry.grid(row=2, column=0, sticky='w', pady=(0, 10))
+
+        separator_line1 = ttk.Separator(self, orient=tk.HORIZONTAL)
+        separator_line1.grid(row=3, column=0, sticky="ew", pady=10)
+        self.grid_rowconfigure(3)
+
+        process_button = tk.Button(self, text="Розпочати тестування", command=self.start_testing, font=self.font_button,
+                                   fg="white", bg="black")
+        process_button.grid(row=4, column=0, sticky='ew', pady=(0, 10))
+
+    def start_testing(self):
+        """Здійснює тестування"""
+
+        task_num = int(self.quantity_entry.get())
+        self.tasks = random.sample(self.tasks, task_num)
+
+        # self.task_iter = iter(self.tasks)
+        # i = next(self.task_iter)
+        for i in self.tasks:
+            # додати основні елементи
+            task_label = tk.Label(self, text="Оберіть пропущене слово.", font=self.font_label)
+            task_label.grid(row=0, column=0, sticky='w', pady=(0, 5))
+
+            separator_line1 = ttk.Separator(self, orient=tk.HORIZONTAL)
+            separator_line1.grid(row=1, column=0, sticky="ew", pady=10)
+            self.grid_rowconfigure(1)
+
+            # додати елементи завдань
+            task_section = tk.Frame(self)
+            task_section.grid(row=2, column=0, sticky="nsew")
+
+            stem_label = tk.Label(task_section, text=self.make_task(i), font=self.font_head)
+            stem_label.grid(row=0, column=0, sticky='w', pady=10)
+
+            distractors = [j for j in i[0][2:] if j != i[0][0].lower()]
+            distractors = random.sample(distractors, 2)
+            distractors.append(i[0][0].lower())
+            self.selected_value = tk.StringVar()
+            for j, distractor in enumerate(distractors):
+                radio_button = tk.Radiobutton(task_section, text=distractor, variable=self.selected_value, value=distractor,
+                                              font=self.font_label)
+                radio_button.grid(row=j + 1, column=0, sticky='w', pady=(0, 5))
+
+            # додати основні елементи
+            separator_line2 = ttk.Separator(self, orient=tk.HORIZONTAL)
+            separator_line2.grid(row=3, column=0, sticky="ew", pady=10)
+            self.grid_rowconfigure(3)
+
+            next_button = tk.Button(self, text="Зберегти відповідь", command=self.save_answer(),
+                                    font=self.font_button,
+                                    fg="white", bg="black")
+            next_button.grid(row=4, column=0, sticky='ew', pady=(0, 10))
+
+    @staticmethod
+    def make_task(tokens: list[list]) -> str:
+        """Створює текст для речень"""
+
+        # впорядкувати токени
+        tokens_sorted = []
+        for i in range(len(tokens)):
+            for j in tokens:
+                if j[1] == i:
+                    tokens_sorted.append(j)
+
+        question = ""
+        for i, token in enumerate(tokens_sorted):
+            # перевірити, чи цільове слово
+            if len(token) > 2:
+                text = "___"
+            else:
+                text = token[0]
+
+            # додати пробіл перед токеном, якщо треба
+            if len(question) != 0 and re.fullmatch(r"[\(—«\w\d].*", text):
+                question += " "
+
+            # доєднати слово
+            question += text
+
+        return question
+
+    def save_answer(self):
+        # очистити вікно
+        for widget in self.winfo_children():
+            widget.destroy()
 
     def upload_tasks(self):
         """Дозволяє завантажити свої тексти у БД"""
@@ -691,6 +784,7 @@ class Application(tk.Tk):
 if __name__ == '__main__':
     con = sqlite3.connect('tasks.db')
     cur = con.cursor()
+    morph = pymorphy3.MorphAnalyzer(lang='uk')
     app = Application()
     app.mainloop()
     con.close()
