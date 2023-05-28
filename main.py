@@ -11,13 +11,10 @@ from collections import defaultdict
 import re
 import pymorphy3
 
-con = sqlite3.connect('tasks.db')
-cur = con.cursor()
-
 
 # узгодження назв доступних частин мови в англійській та українській
-pos_ukrainian_mapping = {"noun": "іменник",
-                         "pronoun": "займенник"}
+pos_ukrainian_mapping = {"іменник": "noun",
+                         "займенник": "pronoun"}
 
 # узгодження позначень частин мови stanza і pymorphy з позначеннями БД
 pos_name_mapping = {'ADJ': 'adjective',
@@ -104,7 +101,7 @@ class SQL:
                       for i, boolean in enumerate(cur.fetchall()[0][1:]) if boolean == 1]
 
         # отримати список цільових слів за частиною мови та рівнем
-        cur.execute(f"""SELECT text, sentence_id, token_index, pos_id, {", ".join(level_list)}
+        cur.execute(f"""SELECT 'text', sentence_id, token_index, pos_id, {", ".join(level_list)}
                         FROM token
                         INNER JOIN {pos}
                             ON token.pos_id = {pos}.{pos}_id
@@ -181,7 +178,7 @@ class SQL:
             # прив'язати речення до набору
             finally:
                 cur.execute(f"""INSERT INTO sentence_set
-                                VALUES ('{set_id}', '{sentence_id}')""")
+                                VALUES ('{sentence_id}', '{set_id}')""")
                 con.commit()
 
     @staticmethod
@@ -251,7 +248,6 @@ class SQL:
         results = {}
         for level_id, name in cur.fetchall():
             results[name] = level_id
-        print(results)
         return results
 
     @staticmethod
@@ -261,7 +257,6 @@ class SQL:
         results = {}
         for set_id, name, description in cur.fetchall():
             results[name] = set_id, description
-        print(results)
         return results
 
 
@@ -575,7 +570,7 @@ class Body(tk.Frame):
         for widget in self.winfo_children():
             widget.destroy()
 
-        # створити віджети
+        # створити віджети для вибору рівня, частини мови та набору вправ
         header_label = tk.Label(self, text="Оберіть параметри для подальшого тестування", font=self.font_head)
         header_label.grid(row=0, column=0, sticky='w', pady=10)
 
@@ -591,7 +586,7 @@ class Body(tk.Frame):
 
         pos_label = tk.Label(self, text="Оберіть цільову частину мови:", font=self.font_label)
         pos_label.grid(row=4, column=0, sticky='w', pady=(0, 5))
-        pos_values = list(pos_ukrainian_mapping.values())
+        pos_values = list(pos_ukrainian_mapping.keys())
         self.pos_dropdown = ttk.Combobox(self, values=pos_values)
         self.pos_dropdown.grid(row=5, column=0, sticky='w', pady=(0, 10))
 
@@ -614,11 +609,20 @@ class Body(tk.Frame):
         process_button.grid(row=10, column=0, sticky='ew', pady=(0, 10))
 
     def get_tasks(self):
+        """Обирає із БД потрібні вправи"""
+
+        # отримати дані про обрані вправи і завантажити їх
         selected_level = self.level_values.get(self.level_dropdown.get())
         selected_pos = pos_ukrainian_mapping.get(self.pos_dropdown.get())
-        selected_set = self.level_values.get(self.set_dropdown.get())
-        print((selected_level, selected_pos, selected_set))
-        # self.tasks = SQL.choose_tasks()
+        selected_set = self.set_values.get(self.set_dropdown.get())[0]
+        self.tasks = SQL.choose_tasks(selected_level, selected_pos, selected_set)
+
+        # очистити вікно
+        for widget in self.winfo_children():
+            widget.destroy()
+
+        #
+        messagebox.showinfo("Success", f"Доступно {len(self.tasks)} завдань.")
 
     def upload_tasks(self):
         """Дозволяє завантажити свої тексти у БД"""
@@ -685,8 +689,8 @@ class Application(tk.Tk):
 
 
 if __name__ == '__main__':
-    # con = sqlite3.connect('tasks.db')
-    # cur = con.cursor()
+    con = sqlite3.connect('tasks.db')
+    cur = con.cursor()
     app = Application()
     app.mainloop()
-    # con.close()
+    con.close()
