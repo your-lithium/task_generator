@@ -500,6 +500,11 @@ class Body(tk.Frame):
         super().__init__(master, *args, **kwargs)
 
         # визначити параметри шрифтів
+        self.task_num = None
+        self.answer_mapping = None
+        self.answers = None
+        self.task_section = None
+        self.task_iter = None
         self.selected_value = None
         self.quantity_entry = None
         self.set_values = None
@@ -644,45 +649,77 @@ class Body(tk.Frame):
     def start_testing(self):
         """Здійснює тестування"""
 
-        task_num = int(self.quantity_entry.get())
-        self.tasks = random.sample(self.tasks, task_num)
+        self.task_num = int(self.quantity_entry.get())
+        self.tasks = random.sample(self.tasks, self.task_num)
 
-        # self.task_iter = iter(self.tasks)
-        # i = next(self.task_iter)
-        for i in self.tasks:
-            # додати основні елементи
-            task_label = tk.Label(self, text="Оберіть пропущене слово.", font=self.font_label)
-            task_label.grid(row=0, column=0, sticky='w', pady=(0, 5))
+        # очистити вікно
+        for widget in self.winfo_children():
+            widget.destroy()
 
-            separator_line1 = ttk.Separator(self, orient=tk.HORIZONTAL)
-            separator_line1.grid(row=1, column=0, sticky="ew", pady=10)
-            self.grid_rowconfigure(1)
+        # додати основні елементи
+        task_label = tk.Label(self, text="Оберіть пропущене слово.", font=self.font_label)
+        task_label.grid(row=0, column=0, sticky='w', pady=(0, 5))
 
-            # додати елементи завдань
-            task_section = tk.Frame(self)
-            task_section.grid(row=2, column=0, sticky="nsew")
+        separator_line1 = ttk.Separator(self, orient=tk.HORIZONTAL)
+        separator_line1.grid(row=1, column=0, sticky="ew", pady=10)
+        self.grid_rowconfigure(1)
 
-            stem_label = tk.Label(task_section, text=self.make_task(i), font=self.font_head)
+        # додати елементи завдань
+        self.task_iter = iter(self.tasks)
+        self.answers = []
+        self.task_section = tk.Frame(self)
+        self.task_section.grid(row=2, column=0, sticky="nsew")
+        self.play_task()
+
+        # додати основні елементи
+        separator_line2 = ttk.Separator(self, orient=tk.HORIZONTAL)
+        separator_line2.grid(row=3, column=0, sticky="ew", pady=10)
+        self.grid_rowconfigure(3)
+
+        next_button = tk.Button(self, text="Зберегти відповідь", command=self.play_task,
+                                font=self.font_button, fg="white", bg="black")
+        next_button.grid(row=4, column=0, sticky='ew', pady=(0, 10))
+
+    def play_task(self):
+        """Заповнює завдання і забирає відповіді"""
+
+        try:
+            # забрати попередню відповідь
+            self.answers.append(self.answer_mapping.get(self.selected_value.get()))
+        except AttributeError:
+            pass
+
+        try:
+            i = next(self.task_iter)
+        except StopIteration:
+            # якщо завдання закінчились:
+            messagebox.showinfo("Результат",
+                                f"Правильна відповідь на {self.answers.count(True)} із {self.task_num} вправ.")
+            # messagebox.Button("На початок", command=self.starting_screen(), font=self.font_button,
+            #                   fg="white", bg="black")
+            self.starting_screen()
+        else:
+            # очистити рамку
+            for widget in self.task_section.winfo_children():
+                widget.destroy()
+
+            # створити віджети завдання
+            stem_label = tk.Label(self.task_section, text=self.make_task(i), font=self.font_head)
             stem_label.grid(row=0, column=0, sticky='w', pady=10)
 
             distractors = [j for j in i[0][2:] if j != i[0][0].lower()]
             distractors = random.sample(distractors, 2)
             distractors.append(i[0][0].lower())
+            self.answer_mapping = {i[0][0].lower(): True,
+                                   distractors[0]: False,
+                                   distractors[1]: False}
+            random.shuffle(distractors)
+
             self.selected_value = tk.StringVar()
             for j, distractor in enumerate(distractors):
-                radio_button = tk.Radiobutton(task_section, text=distractor, variable=self.selected_value, value=distractor,
-                                              font=self.font_label)
+                radio_button = tk.Radiobutton(self.task_section, text=distractor, variable=self.selected_value,
+                                              value=distractor, font=self.font_label)
                 radio_button.grid(row=j + 1, column=0, sticky='w', pady=(0, 5))
-
-            # додати основні елементи
-            separator_line2 = ttk.Separator(self, orient=tk.HORIZONTAL)
-            separator_line2.grid(row=3, column=0, sticky="ew", pady=10)
-            self.grid_rowconfigure(3)
-
-            next_button = tk.Button(self, text="Зберегти відповідь", command=self.save_answer(),
-                                    font=self.font_button,
-                                    fg="white", bg="black")
-            next_button.grid(row=4, column=0, sticky='ew', pady=(0, 10))
 
     @staticmethod
     def make_task(tokens: list[list]) -> str:
@@ -704,18 +741,13 @@ class Body(tk.Frame):
                 text = token[0]
 
             # додати пробіл перед токеном, якщо треба
-            if len(question) != 0 and re.fullmatch(r"[\(—«\w\d].*", text):
+            if len(question) != 0 and re.fullmatch(r"[(—«\w].*", text):
                 question += " "
 
             # доєднати слово
             question += text
 
         return question
-
-    def save_answer(self):
-        # очистити вікно
-        for widget in self.winfo_children():
-            widget.destroy()
 
     def upload_tasks(self):
         """Дозволяє завантажити свої тексти у БД"""
