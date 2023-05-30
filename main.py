@@ -695,8 +695,6 @@ class Body(tk.Frame):
             # якщо завдання закінчились:
             messagebox.showinfo("Результат",
                                 f"Правильна відповідь на {self.answers.count(True)} із {self.task_num} вправ.")
-            # messagebox.Button("На початок", command=self.starting_screen(), font=self.font_button,
-            #                   fg="white", bg="black")
             self.starting_screen()
         else:
             # очистити рамку
