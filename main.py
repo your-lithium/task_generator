@@ -436,7 +436,7 @@ class Text:
 
     def read_text(self, file_path: str) -> None:
         """Зчитує текст із файлу"""
-        with open(file_path, encoding="windows-1251") as file:
+        with open(file_path, encoding="utf-8") as file:
             self.text = file.read()
 
     def clean_text(self) -> None:
@@ -569,6 +569,7 @@ class Body(tk.CTkFrame):
         super().__init__(master, *args, **kwargs)
 
         # визначити параметри шрифтів
+        self.toplevel_window = None
         self.task_num = None
         self.answer_mapping = None
         self.answers = None
@@ -773,9 +774,9 @@ class Body(tk.CTkFrame):
 
             self.selected_value = tk.StringVar()
             for j, distractor in enumerate(distractors):
-                pady_value = (0, 5)  # Default pady value
+                pady_value = (0, 5)
                 if j == len(distractors) - 1:
-                    pady_value = (0, 15)  # Pady value for the last element
+                    pady_value = (0, 15)
 
                 radio_button = tk.CTkRadioButton(self.task_section, text=distractor, variable=self.selected_value,
                                                  value=distractor, font=self.font_label)
@@ -818,38 +819,64 @@ class Body(tk.CTkFrame):
 
         # створити віджети
         header_label = tk.CTkLabel(self, text="Внесіть потрібні дані про новий набір вправ", font=self.font_head)
-        header_label.grid(row=0, column=0, sticky='w', pady=10, padx=10)
+        header_label.grid(row=0, column=0, columnspan=2, sticky='w', pady=10, padx=10)
 
         name_label = tk.CTkLabel(self, text="Введіть бажану назву набору:", font=self.font_label)
-        name_label.grid(row=1, column=0, sticky='w', pady=(0, 5), padx=10)
+        name_label.grid(row=1, column=0, columnspan=2, sticky='w', pady=(0, 5), padx=(10, 5))
         self.name_entry = tk.CTkEntry(self, font=self.font_label)
-        self.name_entry.grid(row=2, column=0, sticky='w', pady=(0, 10), padx=10)
+        self.name_entry.grid(row=2, column=0, sticky='ew', pady=(0, 10), padx=10)
+        name_button = tk.CTkButton(self, text="Переглянути зайняті", command=self.show_names, font=self.font_button)
+        name_button.grid(row=2, column=1, sticky='ew', pady=(0, 10), padx=(5, 10))
 
         separator_line1 = ttk.Separator(self, orient=tk.HORIZONTAL)
-        separator_line1.grid(row=3, column=0, sticky="ew", pady=10)
+        separator_line1.grid(row=3, column=0, columnspan=2, sticky="ew", pady=10)
         self.grid_rowconfigure(3)
 
         description_label = tk.CTkLabel(self, text="Введіть опис нового набору:", font=self.font_label)
-        description_label.grid(row=4, column=0, sticky='w', pady=(0, 5), padx=10)
+        description_label.grid(row=4, column=0, columnspan=2, sticky='w', pady=(0, 5), padx=10)
         self.description_entry = tk.CTkEntry(self, font=self.font_label)
         self.description_entry.grid(row=5, column=0, columnspan=2, sticky='ew', pady=(0, 10), padx=10)
 
         separator_line2 = ttk.Separator(self, orient=tk.HORIZONTAL)
-        separator_line2.grid(row=6, column=0, sticky="ew", pady=10)
+        separator_line2.grid(row=6, column=0, columnspan=2, sticky="ew", pady=10)
         self.grid_rowconfigure(6)
 
         file_label = tk.CTkLabel(self, text="Оберіть файл із вашим текстом:", font=self.font_label)
-        file_label.grid(row=7, column=0, sticky='w', pady=(0, 5), padx=10)
+        file_label.grid(row=7, column=0, columnspan=2, sticky='w', pady=(0, 5), padx=10)
         file_button = tk.CTkButton(self, text="Вибрати файл", command=self.choose_file, font=self.font_button)
         file_button.grid(row=8, column=0, sticky='w', pady=(0, 10), padx=10)
 
         separator_line3 = ttk.Separator(self, orient=tk.HORIZONTAL)
-        separator_line3.grid(row=9, column=0, sticky="ew", pady=10)
+        separator_line3.grid(row=9, column=0, columnspan=2, sticky="ew", pady=10)
         self.grid_rowconfigure(9)
 
         process_button = tk.CTkButton(self, text="Завантажити вправи", command=self.process_tasks,
                                       font=self.font_button)
-        process_button.grid(row=10, column=0, sticky='ew', pady=10, padx=10)
+        process_button.grid(row=10, column=0, columnspan=2, sticky='ew', pady=10, padx=10)
+
+    def show_names(self):
+        """Показує вже зайняті назви наборів з їхніми описами"""
+
+        if self.toplevel_window is None or not self.toplevel_window.winfo_exists():
+            sets = SQL.get_sets()
+            self.toplevel_window = tk.CTkToplevel(self)
+            self.toplevel_window.title("Зайняті назви наборів")
+            for i in sets.items():
+                set_name = i[0]
+                set_id = i[1][0]
+                set_description = i[1][1]
+                pady_value = (10, 0)
+                if set_id == len(sets.items()):
+                    pady_value = 10
+
+                set_frame = tk.CTkFrame(self.toplevel_window)
+                set_frame.grid(row=set_id - 1, column=0, sticky="nsew", padx=10, pady=pady_value)
+                name_label = tk.CTkLabel(set_frame, text=set_name, font=self.font_head)
+                name_label.grid(row=0, column=0, sticky='w', pady=(10, 0), padx=10)
+                description_label = tk.CTkLabel(set_frame, text=set_description, font=self.font_label)
+                description_label.grid(row=1, column=0, sticky='w', pady=(0, 10), padx=10)
+        else:
+            self.toplevel_window.focus()
 
     def choose_file(self):
         """Дозволяє отримати шлях до файлу із текстом для вправ"""
