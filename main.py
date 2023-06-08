@@ -27,7 +27,7 @@ pos_name_mapping = {'ADJ': 'adjective',
                     'NUM': 'number',
                     'PART': 'particle',
                     'PRON': 'pronoun',
-                    'PROPN': 'noun',
+                    'PROPN': 'proper_noun',
                     'PUNCT': 'punct',
                     'SCONJ': 'conjunction',
                     'SYM': 'symbol',
@@ -321,12 +321,16 @@ class Pronoun(Token):
             else:
                 lemma = lemmas[0]
 
-        self.forms = {'nom': lemma.inflect({'nomn'}).word,
-                      'gen': lemma.inflect({'gent'}).word,
-                      'dat': lemma.inflect({'datv'}).word,
-                      'acc': lemma.inflect({'accs'}).word,
-                      'ins': lemma.inflect({'ablt'}).word,
-                      'loc': lemma.inflect({'loct'}).word}
+        try:
+            self.forms = {'nom': lemma.inflect({'nomn'}).word,
+                          'gen': lemma.inflect({'gent'}).word,
+                          'dat': lemma.inflect({'datv'}).word,
+                          'acc': lemma.inflect({'accs'}).word,
+                          'ins': lemma.inflect({'ablt'}).word,
+                          'loc': lemma.inflect({'loct'}).word}
+        except AttributeError:
+            self.form = None
+            self.forms = None
 
     def get_features(self):
         try:
@@ -369,29 +373,36 @@ class Noun(Token):
     def get_forms(self):
         lemmas = morph.parse(self.text)
         for i in lemmas:
-            if pos_name_mapping[i.tag.POS] == self.pos \
-                    and (case_mapping.get(i.tag.case) is not None and case_mapping.get(i.tag.case) in self.form) or (
-                    i.tag.case is None and self.form == 'nom_s') \
-                    and {'Pltm'} not in i.tag:
+            if (pos_name_mapping[i.tag.POS] == self.pos and
+                    ((case_mapping.get(i.tag.case) is not None and case_mapping.get(i.tag.case) in self.form) or
+                     (i.tag.case is None and self.form == 'nom_s')) and
+                    'Pltm' not in i.tag and
+                    'Name' not in i.tag and
+                    'Surn' not in i.tag and
+                    'Patr' not in i.tag):
                 lemma = i.normalized
                 break
-            else:
-                lemma = lemmas[0].normalized
+        else:
+            lemma = lemmas[0].normalized
 
-        self.forms = {'nom_s': lemma.inflect({'nomn'}).word,
-                      'gen_s': lemma.inflect({'gent'}).word,
-                      'dat_s': lemma.inflect({'datv'}).word,
-                      'acc_s': lemma.inflect({'accs'}).word,
-                      'ins_s': lemma.inflect({'ablt'}).word,
-                      'loc_s': lemma.inflect({'loct'}).word,
-                      'voc_s': lemma.inflect({'voct'}).word,
-                      'nom_p': lemma.inflect({'plur', 'nomn'}).word,
-                      'gen_p': lemma.inflect({'plur', 'gent'}).word,
-                      'dat_p': lemma.inflect({'plur', 'datv'}).word,
-                      'acc_p': lemma.inflect({'plur', 'accs'}).word,
-                      'ins_p': lemma.inflect({'plur', 'ablt'}).word,
-                      'loc_p': lemma.inflect({'plur', 'loct'}).word,
-                      'voc_p': lemma.inflect({'plur', 'voct'}).word}
+        try:
+            self.forms = {'nom_s': lemma.inflect({'nomn'}).word,
+                          'gen_s': lemma.inflect({'gent'}).word,
+                          'dat_s': lemma.inflect({'datv'}).word,
+                          'acc_s': lemma.inflect({'accs'}).word,
+                          'ins_s': lemma.inflect({'ablt'}).word,
+                          'loc_s': lemma.inflect({'loct'}).word,
+                          'voc_s': lemma.inflect({'voct'}).word,
+                          'nom_p': lemma.inflect({'plur', 'nomn'}).word,
+                          'gen_p': lemma.inflect({'plur', 'gent'}).word,
+                          'dat_p': lemma.inflect({'plur', 'datv'}).word,
+                          'acc_p': lemma.inflect({'plur', 'accs'}).word,
+                          'ins_p': lemma.inflect({'plur', 'ablt'}).word,
+                          'loc_p': lemma.inflect({'plur', 'loct'}).word,
+                          'voc_p': lemma.inflect({'plur', 'voct'}).word}
+        except AttributeError:
+            self.form = None
+            self.forms = None
 
     def get_features(self):
         try:
@@ -413,6 +424,19 @@ class Pluralia(Token):
 
     def get_pos(self):
         self.pos = 'pluralia'
+
+    def get_dict(self):
+        return super().get_dict()
+
+
+class ProperNoun(Token):
+    """Обробляє власні назви із користувацького тексту"""
+
+    def __init__(self, token_doc):
+        super().__init__(token_doc)
+
+    def get_pos(self):
+        self.pos = 'proper_noun'
 
     def get_dict(self):
         return super().get_dict()
@@ -484,7 +508,9 @@ class Sentence(Text):
 
     def analyse_tokens(self):
         for token in self.sentence_doc.words:
-            if token.upos in self.pos_class_mapping and 'Ptan' not in token.feats:
+            if token.upos == "PROPN":
+                self.tokens.append(ProperNoun(token).get_dict())
+            elif token.upos in self.pos_class_mapping and 'Ptan' not in token.feats:
                 token_instance = self.pos_class_mapping[token.upos](token)
                 self.tokens.append(token_instance.get_dict())
             elif token.feats and 'Ptan' in token.feats:
