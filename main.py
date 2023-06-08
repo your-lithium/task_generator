@@ -630,7 +630,11 @@ class Body(tk.CTkFrame):
     def __init__(self, master, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
 
-        # визначити параметри шрифтів
+        # визначити потрібні змінні
+        self.correct = None
+        self.distractors = None
+        self.task = None
+        self.results = None
         self.toplevel_window = None
         self.task_num = None
         self.answer_mapping = None
@@ -648,6 +652,8 @@ class Body(tk.CTkFrame):
         self.name_entry = None
         self.description_entry = None
         self.file_path = None
+
+        # визначити параметри шрифтів
         self.font_head = ("Helvetica", 14, "bold")
         self.font_label = ("Helvetica", 14)
         self.font_button = ("Helvetica", 12)
@@ -779,27 +785,32 @@ class Body(tk.CTkFrame):
         """Здійснює тестування"""
 
         self.task_num = int(self.quantity_entry.get())
-        self.tasks = random.sample(self.tasks, self.task_num)
+        try:
+            self.tasks = random.sample(self.tasks, self.task_num)
+        except ValueError:
+            Messagebox("Недостатньо вправ", f"На жаль, така кількість вправ не доступна. Оберіть {len(self.tasks)}"
+                                            f" або менше вправ.")
+        else:
+            # очистити вікно
+            for widget in self.winfo_children():
+                widget.destroy()
 
-        # очистити вікно
-        for widget in self.winfo_children():
-            widget.destroy()
+            # додати основні елементи
+            task_label = tk.CTkLabel(self, text="Оберіть пропущене слово.", font=self.font_label)
+            task_label.grid(row=0, column=0, sticky='w', pady=(0, 5), padx=10)
 
-        # додати основні елементи
-        task_label = tk.CTkLabel(self, text="Оберіть пропущене слово.", font=self.font_label)
-        task_label.grid(row=0, column=0, sticky='w', pady=(0, 5), padx=10)
+            # додати елементи завдань
+            self.task_iter = iter(self.tasks)
+            self.answers = []
+            self.results = []
+            self.task_section = tk.CTkFrame(self)
+            self.task_section.grid(row=1, column=0, sticky="nsew", padx=10)
+            self.play_task()
 
-        # додати елементи завдань
-        self.task_iter = iter(self.tasks)
-        self.answers = []
-        self.task_section = tk.CTkFrame(self)
-        self.task_section.grid(row=1, column=0, sticky="nsew", padx=10)
-        self.play_task()
-
-        # додати основні елементи
-        next_button = tk.CTkButton(self, text="Зберегти відповідь", command=self.play_task,
-                                   font=self.font_button)
-        next_button.grid(row=2, column=0, sticky='ew', pady=10, padx=10)
+            # додати основні елементи
+            next_button = tk.CTkButton(self, text="Зберегти відповідь", command=self.play_task,
+                                       font=self.font_button)
+            next_button.grid(row=2, column=0, sticky='ew', pady=10, padx=10)
 
     def play_task(self):
         """Заповнює завдання і забирає відповіді"""
@@ -809,34 +820,38 @@ class Body(tk.CTkFrame):
             self.answers.append(self.answer_mapping.get(self.selected_value.get()))
         except AttributeError:
             pass
+        else:
+            if not self.answers[-1]:
+                self.results.append([self.task, self.correct, self.selected_value.get()])
 
         try:
             i = next(self.task_iter)
         except StopIteration:
             # якщо завдання закінчились:
-            Messagebox("Результат", f"Правильна відповідь на {self.answers.count(True)} із {self.task_num} вправ.")
-            self.starting_screen()
+            self.show_results()
         else:
             # очистити рамку
             for widget in self.task_section.winfo_children():
                 widget.destroy()
 
             # створити віджети завдання
-            stem_label = tk.CTkLabel(self.task_section, text=self.make_task(i), font=self.font_head)
+            self.task = self.make_task(i)
+            stem_label = tk.CTkLabel(self.task_section, text=self.task, font=self.font_head)
             stem_label.grid(row=0, column=0, sticky='w', pady=10, padx=10)
-
-            distractors = [j for j in i[0][2:] if j != i[0][0].lower()]
-            distractors = random.sample(distractors, 2)
-            distractors.append(i[0][0].lower())
-            self.answer_mapping = {i[0][0].lower(): True,
-                                   distractors[0]: False,
-                                   distractors[1]: False}
-            random.shuffle(distractors)
+            
+            self.correct = i[0][0].lower()
+            self.distractors = [j for j in i[0][2:] if j != i[0][0].lower()]
+            self.distractors = random.sample(self.distractors, 2)
+            self.distractors.append(self.correct)
+            self.answer_mapping = {self.correct: True,
+                                   self.distractors[0]: False,
+                                   self.distractors[1]: False}
+            random.shuffle(self.distractors)
 
             self.selected_value = tk.StringVar()
-            for j, distractor in enumerate(distractors):
+            for j, distractor in enumerate(self.distractors):
                 pady_value = (0, 5)
-                if j == len(distractors) - 1:
+                if j == len(self.distractors) - 1:
                     pady_value = (0, 15)
 
                 radio_button = tk.CTkRadioButton(self.task_section, text=distractor, variable=self.selected_value,
@@ -870,6 +885,61 @@ class Body(tk.CTkFrame):
             question += text
 
         return question
+
+    def show_results(self):
+        """Показує результати проходження тестування"""
+        for widget in self.winfo_children():
+            widget.destroy()
+
+        result_label = tk.CTkLabel(self, font=self.font_head,
+                                   text=f"Правильна відповідь на {self.answers.count(True)} із {self.task_num} вправ.")
+        result_label.grid(row=0, column=0, pady=(20, 5), padx=20)
+
+        if len(self.results) > 0:
+            show_mistakes_button = tk.CTkButton(self, text="Переглянути помилки",
+                                                command=self.show_mistakes, font=self.font_button)
+            show_mistakes_button.grid(row=1, column=0, pady=5, padx=20)
+            starting_screen_button = tk.CTkButton(self, text="Завершити тестування",
+                                                  command=self.starting_screen, font=self.font_button)
+            starting_screen_button.grid(row=2, column=0, pady=(5, 20), padx=20)
+        else:
+            starting_screen_button = tk.CTkButton(self, text="Завершити тестування",
+                                                  command=self.starting_screen, font=self.font_button)
+            starting_screen_button.grid(row=1, column=0, pady=(5, 20), padx=20)
+
+    def show_mistakes(self):
+        """Показує список помилок із виправленнями"""
+
+        if self.toplevel_window is None or not self.toplevel_window.winfo_exists():
+            self.toplevel_window = tk.CTkToplevel(self)
+            self.toplevel_window.title("Результати")
+            self.toplevel_window.resizable(False, False)
+            self.toplevel_window.grab_set()
+
+            results_frame = tk.CTkFrame(self.toplevel_window)
+            results_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+            results_frame.grid_columnconfigure(0, minsize=250)
+
+            for i, mistake in enumerate(self.results):
+                task = mistake[0]
+                correct = mistake[1]
+                answer = mistake[2]
+                pady_value = (10, 0)
+                if i == len(self.results) - 1:
+                    pady_value = 10
+
+                mistake_frame = tk.CTkFrame(results_frame)
+                mistake_frame.grid(row=i, column=0, sticky="ew", padx=10, pady=pady_value)
+                mistake_frame.grid_columnconfigure(0, minsize=250)
+
+                task_label = tk.CTkLabel(mistake_frame, text=task, font=self.font_head)
+                task_label.grid(row=0, column=0, sticky='w', pady=(10, 0), padx=10)
+                correct_label = tk.CTkLabel(mistake_frame, text=f"Правильна відповідь: {correct}", font=self.font_label)
+                correct_label.grid(row=1, column=0, sticky='w', pady=0, padx=10)
+                answer_label = tk.CTkLabel(mistake_frame, text=f"Ваша відповідь: {answer}", font=self.font_label)
+                answer_label.grid(row=2, column=0, sticky='w', pady=(0, 10), padx=10)
+        else:
+            self.toplevel_window.focus()
 
     def upload_tasks(self):
         """Дозволяє завантажити свої тексти у БД"""
@@ -958,8 +1028,9 @@ class Body(tk.CTkFrame):
                     Text(self.file_path, [self.name_entry.get(), self.description_entry.get()])
                 except TypeError:
                     Messagebox("Пусті поля", "Заповніть, будь ласка, всі поля.")
-                except Exception:
+                except Exception as e:
                     Messagebox("Помилка", "Сталася помилка. Будь ласка, спробуйте знову.")
+                    print(e)
                 else:
                     Messagebox("Успіх!", "Було успішно укладено завдання із вашого тексту.")
                     self.starting_screen()
