@@ -5,7 +5,6 @@ import sqlite3
 import customtkinter as tk
 from tkinter import ttk
 import tkinter.filedialog as filedialog
-from tkinter import messagebox
 import random
 from collections import defaultdict
 import re
@@ -181,6 +180,7 @@ class SQL:
 
             # прив'язати речення до набору
             finally:
+                # noinspection PyUnboundLocalVariable
                 cur.execute(f"""INSERT INTO sentence_set
                                 VALUES ('{sentence_id}', '{set_id}')""")
                 con.commit()
@@ -263,6 +263,15 @@ class SQL:
             results[name] = set_id, description
         return results
 
+    @staticmethod
+    def check_sets(task_set_name: str) -> bool:
+        """З'ясовує, чи існує набір із заданою назвою"""
+        cur.execute(f"SELECT 1 FROM 'set' WHERE name = '{task_set_name}' LIMIT 1")
+        if len(cur.fetchall()) == 0:
+            return False
+        else:
+            return True
+
 
 class Token:
     """Обробляє слова із користувацького тексту"""
@@ -322,6 +331,7 @@ class Pronoun(Token):
                 lemma = lemmas[0]
 
         try:
+            # noinspection PyUnboundLocalVariable
             self.forms = {'nom': lemma.inflect({'nomn'}).word,
                           'gen': lemma.inflect({'gent'}).word,
                           'dat': lemma.inflect({'datv'}).word,
@@ -523,6 +533,7 @@ class Sentence(Text):
 
 
 class Spinbox(tk.CTkFrame):
+    """Створює віджет Spinbox"""
     def __init__(self, *args,
                  width: int = 150,
                  height: int = 32,
@@ -588,6 +599,31 @@ class Spinbox(tk.CTkFrame):
         self.entry.insert(0, str(int(value)))
 
 
+class Messagebox(tk.CTkToplevel):
+    """Створює віконце з повідомленням"""
+    def __init__(self, title: str, text: str) -> None:
+        super().__init__()
+        self.title(title)
+        self.resizable(False, False)
+
+        self.frame = tk.CTkFrame(self)
+        self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+
+        text_label = tk.CTkLabel(self.frame, text=text, font=("Helvetica", 14), wraplength=300)
+        text_label.grid(row=0, column=0, pady=(20, 5), padx=20)
+
+        button = tk.CTkButton(self.frame, text="OK", font=("Helvetica", 12), command=self.destroy)
+        button.grid(row=1, column=0, pady=(5, 20), padx=20)
+
+        self.focus_force()
+        self.grab_set()
+
+    def destroy(self):
+        self.grab_release()
+        super().destroy()
+
+
+# noinspection PyBroadException
 class Body(tk.CTkFrame):
     """Формує тіло інтерфейсу"""
 
@@ -778,8 +814,7 @@ class Body(tk.CTkFrame):
             i = next(self.task_iter)
         except StopIteration:
             # якщо завдання закінчились:
-            messagebox.showinfo("Результат",
-                                f"Правильна відповідь на {self.answers.count(True)} із {self.task_num} вправ.")
+            Messagebox("Результат", f"Правильна відповідь на {self.answers.count(True)} із {self.task_num} вправ.")
             self.starting_screen()
         else:
             # очистити рамку
@@ -885,22 +920,29 @@ class Body(tk.CTkFrame):
 
         if self.toplevel_window is None or not self.toplevel_window.winfo_exists():
             sets = SQL.get_sets()
-            self.toplevel_window = tk.CTkToplevel(self)
-            self.toplevel_window.title("Зайняті назви наборів")
-            for i in sets.items():
-                set_name = i[0]
-                set_id = i[1][0]
-                set_description = i[1][1]
-                pady_value = (10, 0)
-                if set_id == len(sets.items()):
-                    pady_value = 10
+            if len(sets) > 0:
+                self.toplevel_window = tk.CTkToplevel(self)
+                self.toplevel_window.title("Зайняті назви наборів")
+                self.toplevel_window.resizable(False, False)
+                self.toplevel_window.grab_set()
 
-                set_frame = tk.CTkFrame(self.toplevel_window)
-                set_frame.grid(row=set_id - 1, column=0, sticky="nsew", padx=10, pady=pady_value)
-                name_label = tk.CTkLabel(set_frame, text=set_name, font=self.font_head)
-                name_label.grid(row=0, column=0, sticky='w', pady=(10, 0), padx=10)
-                description_label = tk.CTkLabel(set_frame, text=set_description, font=self.font_label)
-                description_label.grid(row=1, column=0, sticky='w', pady=(0, 10), padx=10)
+                for i in sets.items():
+                    set_name = i[0]
+                    set_id = i[1][0]
+                    set_description = i[1][1]
+                    pady_value = (10, 0)
+                    if set_id == len(sets.items()):
+                        pady_value = 10
+
+                    set_frame = tk.CTkFrame(self.toplevel_window)
+                    set_frame.grid(row=set_id - 1, column=0, sticky="nsew", padx=10, pady=pady_value)
+                    set_frame.grid_columnconfigure(0, minsize=250)
+                    name_label = tk.CTkLabel(set_frame, text=set_name, font=self.font_head)
+                    name_label.grid(row=0, column=0, sticky='w', pady=(10, 0), padx=10)
+                    description_label = tk.CTkLabel(set_frame, text=set_description, font=self.font_label)
+                    description_label.grid(row=1, column=0, sticky='w', pady=(0, 10), padx=10)
+            else:
+                Messagebox("Зайняті назви наборів", "Всі назви вільні. Створюйте перший набір!")
         else:
             self.toplevel_window.focus()
 
@@ -910,9 +952,21 @@ class Body(tk.CTkFrame):
 
     def process_tasks(self):
         """Обробляє завантажені дані"""
-        Text(self.file_path, [self.name_entry.get(), self.description_entry.get()])
-        messagebox.showinfo("Успіх!", "Було успішно укладено завдання із вашого тексту.")
-        self.starting_screen()
+        if SQL.check_sets(self.name_entry.get()) is False:
+            if self.file_path:
+                try:
+                    Text(self.file_path, [self.name_entry.get(), self.description_entry.get()])
+                except TypeError:
+                    Messagebox("Пусті поля", "Заповніть, будь ласка, всі поля.")
+                except Exception:
+                    Messagebox("Помилка", "Сталася помилка. Будь ласка, спробуйте знову.")
+                else:
+                    Messagebox("Успіх!", "Було успішно укладено завдання із вашого тексту.")
+                    self.starting_screen()
+            else:
+                Messagebox("Не обраний файл", "Оберіть, будь ласка, файл із вашим текстом.")
+        else:
+            Messagebox("Зайнята назва", "На жаль, ця назва набору зайнята. Будь ласка, спробуйте іншу.")
 
 
 class Application(tk.CTk):
@@ -923,6 +977,7 @@ class Application(tk.CTk):
         self.title("Вправи із граматики")
         self.grid_rowconfigure(0, weight=1)  # configure grid system
         self.grid_columnconfigure(0, weight=1)
+        self.resizable(False, False)
 
         self.my_frame = Body(master=self)
         self.my_frame.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
