@@ -510,6 +510,7 @@ class Text:
 class Sentence(Text):
     """Обробляє речення із користувацького тексту"""
 
+    # noinspection PyMissingConstructor
     def __init__(self, sentence_doc: stanza.models.common.doc.Sentence):
         self.sentence_doc = sentence_doc
         self.text = sentence_doc.text
@@ -680,7 +681,7 @@ class Body(tk.CTkFrame):
 
         # створити ліву секцію
         left_section = tk.CTkFrame(self)
-        left_section.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
+        left_section.grid(row=2, column=0, padx=(10, 5), pady=10, sticky="nsew")
 
         left_label_text = "Розпочніть тестування \nіз наявними вправами"
         left_label = tk.CTkLabel(left_section, text=left_label_text, font=self.font_label, wraplength=200,
@@ -693,7 +694,7 @@ class Body(tk.CTkFrame):
 
         # створити праву секцію
         right_section = tk.CTkFrame(self)
-        right_section.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
+        right_section.grid(row=2, column=1, padx=(5, 10), pady=10, sticky="nsew")
 
         right_label_text = "Створіть нові вправи\nіз своїх текстів"
         right_label = tk.CTkLabel(right_section, text=right_label_text, font=self.font_label, wraplength=200,
@@ -714,42 +715,46 @@ class Body(tk.CTkFrame):
         for widget in self.winfo_children():
             widget.destroy()
 
+        # поставити кнопку повернення назад
+        back_button = tk.CTkButton(self, text="🡨", command=self.starting_screen, font=self.font_button, width=30)
+        back_button.grid(row=0, column=0, sticky='w', pady=10, padx=10)
+
         # створити віджети для вибору рівня, частини мови та набору вправ
         header_label = tk.CTkLabel(self, text="Оберіть параметри для подальшого тестування", font=self.font_head)
-        header_label.grid(row=0, column=0, sticky='w', pady=10, padx=10)
+        header_label.grid(row=1, column=0, sticky='w', pady=(0, 10), padx=10)
 
         level_label = tk.CTkLabel(self, text="Оберіть бажаний рівень для вправ:", font=self.font_label)
-        level_label.grid(row=1, column=0, sticky='w', pady=(0, 5), padx=10)
+        level_label.grid(row=2, column=0, sticky='w', pady=(0, 5), padx=10)
         self.level_values = SQL.get_levels()
         self.level_dropdown = tk.CTkComboBox(self, values=list(self.level_values.keys()))
-        self.level_dropdown.grid(row=2, column=0, sticky='w', pady=(0, 10), padx=10)
+        self.level_dropdown.grid(row=3, column=0, sticky='w', pady=(0, 10), padx=10)
 
         separator_line1 = ttk.Separator(self, orient=tk.HORIZONTAL)
-        separator_line1.grid(row=3, column=0, sticky="ew", pady=10)
-        self.grid_rowconfigure(3)
+        separator_line1.grid(row=4, column=0, sticky="ew", pady=10)
+        self.grid_rowconfigure(4)
 
         pos_label = tk.CTkLabel(self, text="Оберіть цільову частину мови:", font=self.font_label)
-        pos_label.grid(row=4, column=0, sticky='w', pady=(0, 5), padx=10)
+        pos_label.grid(row=5, column=0, sticky='w', pady=(0, 5), padx=10)
         pos_values = list(pos_ukrainian_mapping.keys())
         self.pos_dropdown = tk.CTkComboBox(self, values=pos_values)
-        self.pos_dropdown.grid(row=5, column=0, sticky='w', pady=(0, 10), padx=10)
+        self.pos_dropdown.grid(row=6, column=0, sticky='w', pady=(0, 10), padx=10)
 
         separator_line2 = ttk.Separator(self, orient=tk.HORIZONTAL)
-        separator_line2.grid(row=6, column=0, sticky="ew", pady=10)
-        self.grid_rowconfigure(6)
+        separator_line2.grid(row=7, column=0, sticky="ew", pady=10)
+        self.grid_rowconfigure(7)
 
         set_label = tk.CTkLabel(self, text="Оберіть потрібний набір вправ:", font=self.font_label)
-        set_label.grid(row=7, column=0, sticky='w', pady=(0, 5), padx=10)
+        set_label.grid(row=8, column=0, sticky='w', pady=(0, 5), padx=10)
         self.set_values = SQL.get_sets()
         self.set_dropdown = tk.CTkComboBox(self, values=list(self.set_values.keys()))
-        self.set_dropdown.grid(row=8, column=0, sticky='w', pady=(0, 10), padx=10)
+        self.set_dropdown.grid(row=9, column=0, sticky='w', pady=(0, 10), padx=10)
 
         separator_line3 = ttk.Separator(self, orient=tk.HORIZONTAL)
-        separator_line3.grid(row=9, column=0, sticky="ew", pady=10)
-        self.grid_rowconfigure(9)
+        separator_line3.grid(row=10, column=0, sticky="ew", pady=10)
+        self.grid_rowconfigure(10)
 
         process_button = tk.CTkButton(self, text="Завантажити вправи", command=self.get_tasks, font=self.font_button)
-        process_button.grid(row=10, column=0, sticky='ew', pady=10, padx=10)
+        process_button.grid(row=11, column=0, sticky='ew', pady=10, padx=10)
 
     def get_tasks(self):
         """Обирає із БД потрібні вправи"""
@@ -764,22 +769,26 @@ class Body(tk.CTkFrame):
         for widget in self.winfo_children():
             widget.destroy()
 
+        # поставити кнопку повернення назад
+        back_button = tk.CTkButton(self, text="🡨", command=self.configure_testing, font=self.font_button, width=30)
+        back_button.grid(row=0, column=0, sticky='w', pady=(0, 10), padx=10)
+
         # створити віджети для вибору кількості вправ
         header_label = tk.CTkLabel(self, text="Оберіть бажану кількість вправ для тестування", font=self.font_head)
-        header_label.grid(row=0, column=0, sticky='w', pady=10, padx=10)
+        header_label.grid(row=1, column=0, sticky='w', pady=10, padx=10)
 
         quantity_label = tk.CTkLabel(self, text=f"Доступно {len(self.tasks)} вправ.", font=self.font_label)
-        quantity_label.grid(row=1, column=0, sticky='w', pady=(0, 5), padx=10)
+        quantity_label.grid(row=2, column=0, sticky='w', pady=(0, 5), padx=10)
         self.quantity_entry = Spinbox(self, max_value=len(self.tasks))
-        self.quantity_entry.grid(row=2, column=0, sticky='w', pady=(0, 10), padx=10)
+        self.quantity_entry.grid(row=3, column=0, sticky='w', pady=(0, 10), padx=10)
 
         separator_line1 = ttk.Separator(self, orient=tk.HORIZONTAL)
-        separator_line1.grid(row=3, column=0, sticky="ew", pady=10)
-        self.grid_rowconfigure(3)
+        separator_line1.grid(row=4, column=0, sticky="ew", pady=10)
+        self.grid_rowconfigure(4)
 
         process_button = tk.CTkButton(self, text="Розпочати тестування", command=self.start_testing,
                                       font=self.font_button)
-        process_button.grid(row=4, column=0, sticky='ew', pady=10, padx=10)
+        process_button.grid(row=5, column=0, sticky='ew', pady=10, padx=10)
 
     def start_testing(self):
         """Здійснює тестування"""
@@ -948,42 +957,46 @@ class Body(tk.CTkFrame):
         for widget in self.winfo_children():
             widget.destroy()
 
+        # поставити кнопку повернення назад
+        back_button = tk.CTkButton(self, text="🡨", command=self.starting_screen, font=self.font_button, width=30)
+        back_button.grid(row=0, column=0, sticky='w', pady=10, padx=10)
+
         # створити віджети
         header_label = tk.CTkLabel(self, text="Внесіть потрібні дані про новий набір вправ", font=self.font_head)
-        header_label.grid(row=0, column=0, columnspan=2, sticky='w', pady=10, padx=10)
+        header_label.grid(row=1, column=0, columnspan=2, sticky='w', pady=(0, 10), padx=10)
 
         name_label = tk.CTkLabel(self, text="Введіть бажану назву набору:", font=self.font_label)
-        name_label.grid(row=1, column=0, columnspan=2, sticky='w', pady=(0, 5), padx=(10, 5))
+        name_label.grid(row=2, column=0, columnspan=2, sticky='w', pady=(0, 5), padx=(10, 5))
         self.name_entry = tk.CTkEntry(self, font=self.font_label)
-        self.name_entry.grid(row=2, column=0, sticky='ew', pady=(0, 10), padx=10)
+        self.name_entry.grid(row=3, column=0, sticky='ew', pady=(0, 10), padx=10)
         name_button = tk.CTkButton(self, text="Переглянути зайняті", command=self.show_names, font=self.font_button)
-        name_button.grid(row=2, column=1, sticky='ew', pady=(0, 10), padx=(5, 10))
+        name_button.grid(row=3, column=1, sticky='ew', pady=(0, 10), padx=(5, 10))
 
         separator_line1 = ttk.Separator(self, orient=tk.HORIZONTAL)
-        separator_line1.grid(row=3, column=0, columnspan=2, sticky="ew", pady=10)
-        self.grid_rowconfigure(3)
+        separator_line1.grid(row=4, column=0, columnspan=2, sticky="ew", pady=10)
+        self.grid_rowconfigure(4)
 
         description_label = tk.CTkLabel(self, text="Введіть опис нового набору:", font=self.font_label)
-        description_label.grid(row=4, column=0, columnspan=2, sticky='w', pady=(0, 5), padx=10)
+        description_label.grid(row=5, column=0, columnspan=2, sticky='w', pady=(0, 5), padx=10)
         self.description_entry = tk.CTkEntry(self, font=self.font_label)
-        self.description_entry.grid(row=5, column=0, columnspan=2, sticky='ew', pady=(0, 10), padx=10)
+        self.description_entry.grid(row=6, column=0, columnspan=2, sticky='ew', pady=(0, 10), padx=10)
 
         separator_line2 = ttk.Separator(self, orient=tk.HORIZONTAL)
-        separator_line2.grid(row=6, column=0, columnspan=2, sticky="ew", pady=10)
-        self.grid_rowconfigure(6)
+        separator_line2.grid(row=7, column=0, columnspan=2, sticky="ew", pady=10)
+        self.grid_rowconfigure(7)
 
         file_label = tk.CTkLabel(self, text="Оберіть файл із вашим текстом:", font=self.font_label)
-        file_label.grid(row=7, column=0, columnspan=2, sticky='w', pady=(0, 5), padx=10)
+        file_label.grid(row=8, column=0, columnspan=2, sticky='w', pady=(0, 5), padx=10)
         file_button = tk.CTkButton(self, text="Вибрати файл", command=self.choose_file, font=self.font_button)
-        file_button.grid(row=8, column=0, sticky='w', pady=(0, 10), padx=10)
+        file_button.grid(row=9, column=0, sticky='w', pady=(0, 10), padx=10)
 
         separator_line3 = ttk.Separator(self, orient=tk.HORIZONTAL)
-        separator_line3.grid(row=9, column=0, columnspan=2, sticky="ew", pady=10)
-        self.grid_rowconfigure(9)
+        separator_line3.grid(row=10, column=0, columnspan=2, sticky="ew", pady=10)
+        self.grid_rowconfigure(10)
 
         process_button = tk.CTkButton(self, text="Завантажити вправи", command=self.process_tasks,
                                       font=self.font_button)
-        process_button.grid(row=10, column=0, columnspan=2, sticky='ew', pady=10, padx=10)
+        process_button.grid(row=11, column=0, columnspan=2, sticky='ew', pady=10, padx=10)
 
     def show_names(self):
         """Показує вже зайняті назви наборів з їхніми описами"""
