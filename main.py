@@ -86,9 +86,6 @@ class SQL:
     def choose_tasks(level: int, pos: str, set_number: int) -> list[list]:
         """Створює список вправ, які підходять під вимоги користувача"""
 
-        global con
-        global cur
-
         # отримати список словоформ потрібного рівня
         cur.execute(f"""SELECT *
                         FROM {pos}_level
@@ -129,7 +126,7 @@ class SQL:
 
         # почистити стрижні-дублікати
         stems = defaultdict(list)
-        stems_numbers = set([correct[1] for correct in corrects_list])
+        stems_numbers = {correct[1] for correct in corrects_list}
         for sent_id in stems_numbers:
             stems[sent_id] = [correct[:1] + correct[2:] for correct in corrects_list if correct[1] == sent_id]
             if len(stems[sent_id]) > 1:
@@ -146,9 +143,6 @@ class SQL:
     def add_tasks(task_set: list[str], sentences: dict[str, list[dict[str, str | int | dict[str, str | int] | None]]]) \
             -> None:
         """Додає новий користувацький набір вправ у БД"""
-
-        global con
-        global cur
 
         # вставити дані про новий набір вправ
         cur.execute(f"""INSERT INTO "set" (name, description)
@@ -189,7 +183,6 @@ class SQL:
     @staticmethod
     def add_tokens(tokens: list[dict[str, str | int | dict[str, str | int] | None]], sentence_id: int) -> None:
         """Додає слова із речень у БД"""
-
         for token in tokens:
 
             # перевірити, чи цільова частина мови (має вказану форму)
@@ -227,7 +220,6 @@ class SQL:
     @staticmethod
     def add_pos(pos: str, forms: dict[str, str], features: dict[str, str]) -> int:
         """Додає нову лему у БД"""
-
         # отримати список колонок і значень форм і граматичних категорій
         feature_columns = list(features.keys())
         feature_values = list(features.values())
@@ -270,8 +262,7 @@ class SQL:
         cur.execute(f"SELECT 1 FROM 'set' WHERE name = '{task_set_name}' LIMIT 1")
         if len(cur.fetchall()) == 0:
             return False
-        else:
-            return True
+        return True
 
 
 class Token:
@@ -328,8 +319,7 @@ class Pronoun(Token):
             if pos_name_mapping[i.tag.POS] == self.pos and case_mapping[i.tag.case] == self.form:
                 lemma = i
                 break
-            else:
-                lemma = lemmas[0]
+            lemma = lemmas[0]
 
         try:
             # noinspection PyUnboundLocalVariable
@@ -476,7 +466,6 @@ class Text:
 
     def clean_text(self) -> None:
         """Уніфіковує апострофи та лапки у тексті"""
-
         single_quotes = ['`', '‘', '❮', '❯', '‚', '‛', '❛', '❜', '❟', 'ߵ', '´', 'ˊ', '｀', 'ʼ', 'ߴ', '՚', '＇', 'ʹ', 'ʻ',
                          'ʽ', 'ʾ', 'ˈ', '′', '‵', "'"]
         double_quotes = ['„', '⹂', '‟', '“', '”', '❝', '❞', '〝', '〞', '〟', '＂', 'ˮ', '‶', '"']
@@ -500,7 +489,6 @@ class Text:
 
     def analyse_text(self) -> None:
         """Ініціює поділ на речення, подальший аналіз токенів і їхній запис у БД"""
-
         for sentence_doc in self.doc.sentences:
             self.sentences.update(Sentence(sentence_doc).get_dict())
 
@@ -665,7 +653,6 @@ class Body(tk.CTkFrame):
 
     def starting_screen(self):
         """Створює початковий екран"""
-
         # очистити вікно
         for widget in self.winfo_children():
             widget.destroy()
@@ -711,7 +698,6 @@ class Body(tk.CTkFrame):
 
     def configure_testing(self):
         """Запускає тестування"""
-
         # очистити вікно
         for widget in self.winfo_children():
             widget.destroy()
@@ -759,7 +745,6 @@ class Body(tk.CTkFrame):
 
     def get_tasks(self):
         """Обирає із БД потрібні вправи"""
-
         # отримати дані про обрані вправи та завантажити їх
         selected_level = self.level_values.get(self.level_dropdown.get())
         selected_pos = pos_ukrainian_mapping.get(self.pos_dropdown.get())
@@ -793,7 +778,6 @@ class Body(tk.CTkFrame):
 
     def start_testing(self):
         """Здійснює тестування"""
-
         self.task_num = int(self.quantity_entry.get())
         try:
             self.tasks = random.sample(self.tasks, self.task_num)
@@ -824,7 +808,6 @@ class Body(tk.CTkFrame):
 
     def play_task(self):
         """Заповнює завдання і забирає відповіді"""
-
         try:
             # забрати попередню відповідь
             self.answers.append(self.answer_mapping.get(self.selected_value.get()))
@@ -848,7 +831,7 @@ class Body(tk.CTkFrame):
             self.task = self.make_task(i)
             stem_label = tk.CTkLabel(self.task_section, text=self.task, font=self.font_head)
             stem_label.grid(row=0, column=0, sticky='w', pady=10, padx=10)
-            
+
             self.correct = i[0][0].lower()
             self.distractors = [j for j in i[0][2:] if j != i[0][0].lower()]
             self.distractors = random.sample(self.distractors, 2)
@@ -871,7 +854,6 @@ class Body(tk.CTkFrame):
     @staticmethod
     def make_task(tokens: list[list]) -> str:
         """Створює текст для речень"""
-
         # впорядкувати токени
         tokens_sorted = []
         for i in range(len(tokens)):
@@ -919,7 +901,6 @@ class Body(tk.CTkFrame):
 
     def show_mistakes(self):
         """Показує список помилок із виправленнями"""
-
         if self.toplevel_window is None or not self.toplevel_window.winfo_exists():
             self.toplevel_window = tk.CTkToplevel(self)
             self.toplevel_window.title("Результати")
@@ -953,7 +934,6 @@ class Body(tk.CTkFrame):
 
     def upload_tasks(self):
         """Дозволяє завантажити свої тексти у БД"""
-
         # очистити вікно
         for widget in self.winfo_children():
             widget.destroy()
@@ -1001,7 +981,6 @@ class Body(tk.CTkFrame):
 
     def show_names(self):
         """Показує вже зайняті назви наборів з їхніми описами"""
-
         if self.toplevel_window is None or not self.toplevel_window.winfo_exists():
             sets = SQL.get_sets()
             if len(sets) > 0:
