@@ -85,7 +85,6 @@ class SQL:
     @staticmethod
     def choose_tasks(level: int, pos: str, set_number: int) -> list[list]:
         """Створює список вправ, які підходять під вимоги користувача"""
-
         # отримати список словоформ потрібного рівня
         cur.execute(f"""SELECT *
                         FROM {pos}_level
@@ -143,7 +142,6 @@ class SQL:
     def add_tasks(task_set: list[str], sentences: dict[str, list[dict[str, str | int | dict[str, str | int] | None]]]) \
             -> None:
         """Додає новий користувацький набір вправ у БД"""
-
         # вставити дані про новий набір вправ
         cur.execute(f"""INSERT INTO "set" (name, description)
                             VALUES {tuple(task_set)}""")
