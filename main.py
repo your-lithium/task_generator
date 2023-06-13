@@ -383,7 +383,7 @@ class Noun(Token):
     def get_forms(self):
         lemmas = morph.parse(self.text)
         for i in lemmas:
-            if (pos_name_mapping[i.tag.POS] == self.pos and
+            if (i.tag.POS is not None and pos_name_mapping.get(i.tag.POS) == self.pos and
                     ((case_mapping.get(i.tag.case) is not None and case_mapping.get(i.tag.case) in self.form) or
                      (i.tag.case is None and self.form == 'nom_s')) and
                     'Pltm' not in i.tag and
@@ -521,11 +521,11 @@ class Sentence(Text):
         for token in self.sentence_doc.words:
             if token.upos == "PROPN":
                 self.tokens.append(ProperNoun(token).get_dict())
+            elif token.feats and ('Ptan' in token.feats or ('Plur' in token.feats and 'Gender' not in token.feats)):
+                self.tokens.append(Pluralia(token).get_dict())
             elif token.upos in self.pos_class_mapping and 'Ptan' not in token.feats:
                 token_instance = self.pos_class_mapping[token.upos](token)
                 self.tokens.append(token_instance.get_dict())
-            elif token.feats and 'Ptan' in token.feats:
-                self.tokens.append(Pluralia(token).get_dict())
             else:
                 self.tokens.append(Token(token).get_dict())
 
@@ -1041,9 +1041,8 @@ class Body(tk.CTkFrame):
                     Text(self.file_path, [self.name_entry.get(), self.description_entry.get()])
                 except TypeError:
                     Messagebox("Пусті поля", "Заповніть, будь ласка, всі поля.")
-                except Exception as e:
+                except Exception:
                     Messagebox("Помилка", "Сталася помилка. Будь ласка, спробуйте знову.")
-                    print(e)
                 else:
                     Messagebox("Успіх!", "Було успішно укладено завдання із вашого тексту.")
                     self.starting_screen()
