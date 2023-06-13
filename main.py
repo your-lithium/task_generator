@@ -522,6 +522,7 @@ class Sentence(Text):
 
 class Spinbox(tk.CTkFrame):
     """Створює віджет Spinbox"""
+
     def __init__(self, *args,
                  width: int = 150,
                  height: int = 32,
@@ -531,7 +532,6 @@ class Spinbox(tk.CTkFrame):
         super().__init__(*args, width=width, height=height, **kwargs)
 
         self.step_size = step_size
-        self.command = None
         self.max_value = max_value
 
         self.configure(fg_color=("gray78", "gray28"))  # set frame color
@@ -555,8 +555,6 @@ class Spinbox(tk.CTkFrame):
         self.entry.insert(0, 0)
 
     def add_button_callback(self):
-        if self.command is not None:
-            self.command()
         try:
             if int(self.entry.get()) < self.max_value:
                 value = int(self.entry.get()) + self.step_size
@@ -566,8 +564,6 @@ class Spinbox(tk.CTkFrame):
             return
 
     def subtract_button_callback(self):
-        if self.command is not None:
-            self.command()
         try:
             if int(self.entry.get()) > 0:
                 value = int(self.entry.get()) - self.step_size
@@ -589,6 +585,7 @@ class Spinbox(tk.CTkFrame):
 
 class Messagebox(tk.CTkToplevel):
     """Створює віконце з повідомленням"""
+
     def __init__(self, title: str, text: str) -> None:
         super().__init__()
         self.title(title)
