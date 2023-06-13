@@ -122,7 +122,8 @@ class SQL:
                                         WHERE set_id = {set_number}))
                             AND (pos != '{pos}'
                                 OR (pos = '{pos}'
-                                    AND form NOT IN {tuple(level_list)}))
+                                    AND (form NOT IN {tuple(level_list)}
+                                        OR form IS NULL)))
                             """)
         stems_list = [list(row) for row in cur.fetchall()]
 
