@@ -185,25 +185,8 @@ class SQL:
 
             # перевірити, чи цільова частина мови (має вказану форму)
             if token['form']:
-                query = f"""SELECT {token['pos']}_id
-                            FROM {token['pos']}
-                            WHERE {token['form']} = '{token['text'].lower()}'
-                                AND """
-                for k, v in token['features'].items():
-                    if v:
-                        query += f"{k} = '{v}' AND "
-                    else:
-                        query += f"{k} IS NULL AND "
-                query = query[:-5]
-                cur.execute(query)
-
-                # перевірити наявність леми у таблиці
-                try:
-                    pos_id = cur.fetchall()[0][0]
-
-                # леми нема у БД: додати її
-                except IndexError:
-                    pos_id = SQL.add_pos(token['pos'], token['forms'], token['features'])
+                # отримати індекс леми із БД
+                pos_id = SQL.add_pos(token['pos'], token['forms'], token['features'])
 
             # нецільова частина мови: не прив'язувати до таблиці
             else:
@@ -226,13 +209,25 @@ class SQL:
         columns = tuple(form_columns + feature_columns)
         values = tuple(form_values + feature_values)
 
-        # вставити дані про леми у таблицю
-        cur.execute(f"""INSERT INTO {pos} {columns}
+        # перевірити, чи є лема вже в таблиці
+        select_query = f"SELECT {pos}_id FROM {pos} WHERE "
+        for i, value in enumerate(values):
+            if value:
+                select_query += f"{columns[i]} = ?"
+            else:
+                select_query += f"{columns[i]} IS NULL"
+
+            if i != len(values) - 1:
+                select_query += " AND "
+        select_values = tuple(value for value in values if value)
+        cur.execute(select_query, select_values)
+
+        try:
+            pos_id = cur.fetchone()[0]
+        except TypeError:
+            cur.execute(f"""INSERT INTO {pos} {columns}
                         VALUES {values}""".replace('None', 'NULL'))
-        cur.execute(f"""SELECT seq
-                        FROM sqlite_sequence
-                        WHERE name = '{pos}'""")
-        pos_id = cur.fetchall()[0][0]
+            pos_id = cur.lastrowid
 
         return pos_id
 
@@ -266,7 +261,7 @@ class SQL:
 class Token:
     """Обробляє слова із користувацького тексту"""
 
-    def __init__(self, token_doc):
+    def __init__(self, token_doc) -> None:
         self.token_doc = token_doc
         self.text = token_doc.text
         self.index = token_doc.id - 1
@@ -279,19 +274,21 @@ class Token:
         self.features = None
         self.get_features()
 
-    def get_pos(self):
+    def get_pos(self) -> None:
+        """Визначає частину мови"""
         self.pos = pos_name_mapping[self.token_doc.upos]
 
-    def get_form(self):
-        pass
+    def get_form(self) -> None:
+        """Визначає форму слова"""
 
-    def get_forms(self):
-        pass
+    def get_forms(self) -> None:
+        """Визначає парадигму леми слова"""
 
-    def get_features(self):
-        pass
+    def get_features(self) -> None:
+        """Визначає незмінні морфологічні значення леми"""
 
-    def get_dict(self):
+    def get_dict(self) -> dict:
+        """Створює словник з усіма даними про токен"""
         return {'text': self.text, 'token_index': self.index, 'pos': self.pos, 'form': self.form, 'forms': self.forms,
                 'features': self.features}
 
@@ -299,19 +296,22 @@ class Token:
 class Pronoun(Token):
     """Обробляє займенники із користувацького тексту"""
 
-    def __init__(self, token_doc):
+    def __init__(self, token_doc) -> None:
         self.doc_forms = {}
         self.doc_features = {key: value for [key, value] in [pair.split('=')
                                                              for pair in token_doc.feats.split('|')]}
         super().__init__(token_doc)
 
-    def get_pos(self):
+    def get_pos(self) -> None:
+        """Визначає частину мови"""
         self.pos = 'pronoun'
 
-    def get_form(self):
+    def get_form(self) -> None:
+        """Визначає форму слова"""
         self.form = self.doc_features['Case'].lower()
 
-    def get_forms(self):
+    def get_forms(self) -> None:
+        """Визначає парадигму леми слова"""
         lemmas = morph.parse(self.text)
         for i in lemmas:
             if pos_name_mapping[i.tag.POS] == self.pos and case_mapping[i.tag.case] == self.form:
@@ -328,10 +328,19 @@ class Pronoun(Token):
                           'ins': lemma.inflect({'ablt'}).word,
                           'loc': lemma.inflect({'loct'}).word}
         except AttributeError:
-            self.form = None
-            self.forms = None
+            try:
+                self.forms = {'nom': None,
+                              'gen': lemma.inflect({'gent'}).word,
+                              'dat': lemma.inflect({'datv'}).word,
+                              'acc': lemma.inflect({'accs'}).word,
+                              'ins': lemma.inflect({'ablt'}).word,
+                              'loc': lemma.inflect({'loct'}).word}
+            except AttributeError:
+                self.form = None
+                self.forms = None
 
-    def get_features(self):
+    def get_features(self) -> None:
+        """Визначає незмінні морфологічні значення леми"""
         try:
             gender = gender_mapping[self.doc_features['Gender']]
         except KeyError:
@@ -349,27 +358,31 @@ class Pronoun(Token):
 
         self.features = {'gender': gender, 'number': number, 'person': person}
 
-    def get_dict(self):
+    def get_dict(self) -> dict:
+        """Створює словник з усіма даними про токен"""
         return super().get_dict()
 
 
 class Noun(Token):
     """Обробляє іменники із користувацького тексту"""
 
-    def __init__(self, token_doc):
+    def __init__(self, token_doc) -> None:
         self.doc_forms = {}
         self.doc_features = {key: value for [key, value] in [pair.split('=')
                                                              for pair in token_doc.feats.split('|')]}
         super().__init__(token_doc)
 
-    def get_pos(self):
+    def get_pos(self) -> None:
+        """Визначає частину мови"""
         self.pos = 'noun'
 
-    def get_form(self):
+    def get_form(self) -> None:
+        """Визначає форму слова"""
         self.form = self.doc_features['Case'].lower()
         self.form += '_s' if self.doc_features['Number'] == 'Sing' else '_p'
 
-    def get_forms(self):
+    def get_forms(self) -> None:
+        """Визначає парадигму леми слова"""
         lemmas = morph.parse(self.text)
         for i in lemmas:
             if (i.tag.POS is not None and pos_name_mapping.get(i.tag.POS) == self.pos and
@@ -403,7 +416,8 @@ class Noun(Token):
             self.form = None
             self.forms = None
 
-    def get_features(self):
+    def get_features(self) -> None:
+        """Визначає незмінні морфологічні значення леми"""
         try:
             gender = gender_mapping[self.doc_features['Gender']]
         except KeyError:
@@ -411,43 +425,49 @@ class Noun(Token):
 
         self.features = {'gender': gender}
 
-    def get_dict(self):
+    def get_dict(self) -> dict:
+        """Створює словник з усіма даними про токен"""
         return super().get_dict()
 
 
 class Pluralia(Token):
     """Обробляє pluralia tantum із користувацького тексту"""
 
-    def __init__(self, token_doc):
+    def __init__(self, token_doc) -> None:
         super().__init__(token_doc)
 
-    def get_pos(self):
+    def get_pos(self) -> None:
+        """Визначає частину мови"""
         self.pos = 'pluralia'
 
-    def get_dict(self):
+    def get_dict(self) -> dict:
+        """Створює словник з усіма даними про токен"""
         return super().get_dict()
 
 
 class ProperNoun(Token):
     """Обробляє власні назви із користувацького тексту"""
 
-    def __init__(self, token_doc):
+    def __init__(self, token_doc) -> None:
         super().__init__(token_doc)
 
-    def get_pos(self):
+    def get_pos(self) -> None:
+        """Визначає частину мови"""
         self.pos = 'proper_noun'
 
-    def get_dict(self):
+    def get_dict(self) -> dict:
+        """Створює словник з усіма даними про токен"""
         return super().get_dict()
 
 
 class Text:
     """Обробляє користувацький текст"""
 
+    # узгодження частиномовних тегів stanza із доступними для обробки класами
     pos_class_mapping = {'PRON': Pronoun,
                          'NOUN': Noun}
 
-    def __init__(self, file_path: str, task_set: list[str]):
+    def __init__(self, file_path: str, task_set: list[str]) -> None:
         self.set = task_set
         self.text = None
         self.sentences = {}
@@ -498,13 +518,14 @@ class Sentence(Text):
     """Обробляє речення із користувацького тексту"""
 
     # noinspection PyMissingConstructor
-    def __init__(self, sentence_doc: stanza.models.common.doc.Sentence):
+    def __init__(self, sentence_doc: stanza.models.common.doc.Sentence) -> None:
         self.sentence_doc = sentence_doc
         self.text = sentence_doc.text
         self.tokens = []
         self.analyse_tokens()
 
-    def analyse_tokens(self):
+    def analyse_tokens(self) -> None:
+        """Створює відповідні класи для всіх токенів"""
         for token in self.sentence_doc.words:
             if token.upos == "PROPN":
                 self.tokens.append(ProperNoun(token).get_dict())
@@ -516,7 +537,8 @@ class Sentence(Text):
             else:
                 self.tokens.append(Token(token).get_dict())
 
-    def get_dict(self):
+    def get_dict(self) -> dict:
+        """Повертає словник із даними про всі токени"""
         return {self.text: self.tokens}
 
 
@@ -528,17 +550,17 @@ class Spinbox(tk.CTkFrame):
                  height: int = 32,
                  step_size: int = 1,
                  max_value: int,
-                 **kwargs):
+                 **kwargs) -> None:
         super().__init__(*args, width=width, height=height, **kwargs)
 
         self.step_size = step_size
         self.max_value = max_value
 
-        self.configure(fg_color=("gray78", "gray28"))  # set frame color
+        self.configure(fg_color=("gray78", "gray28"))
 
-        self.grid_columnconfigure(0, weight=0)  # buttons don't expand
-        self.grid_columnconfigure(2, weight=0)  # buttons don't expand
-        self.grid_columnconfigure(1, weight=1)  # entry expands
+        self.grid_columnconfigure(0, weight=0)
+        self.grid_columnconfigure(2, weight=0)
+        self.grid_columnconfigure(1, weight=1)
 
         self.subtract_button = tk.CTkButton(self, text="-", width=height - 6, height=height - 6,
                                             command=self.subtract_button_callback)
@@ -551,10 +573,10 @@ class Spinbox(tk.CTkFrame):
                                        command=self.add_button_callback)
         self.add_button.grid(row=0, column=2, padx=(0, 3), pady=3)
 
-        # default value
         self.entry.insert(0, 0)
 
-    def add_button_callback(self):
+    def add_button_callback(self) -> None:
+        """Додає 1 до значення"""
         try:
             if int(self.entry.get()) < self.max_value:
                 value = int(self.entry.get()) + self.step_size
@@ -563,7 +585,8 @@ class Spinbox(tk.CTkFrame):
         except ValueError:
             return
 
-    def subtract_button_callback(self):
+    def subtract_button_callback(self) -> None:
+        """Віднімає 1 від значення"""
         try:
             if int(self.entry.get()) > 0:
                 value = int(self.entry.get()) - self.step_size
@@ -573,12 +596,14 @@ class Spinbox(tk.CTkFrame):
             return
 
     def get(self) -> [int | None]:
+        """Повертає значення поля"""
         try:
             return int(self.entry.get())
         except ValueError:
             return None
 
-    def set(self, value: float):
+    def set(self, value: float) -> None:
+        """Призначає своє значення"""
         self.entry.delete(0, "end")
         self.entry.insert(0, str(int(value)))
 
@@ -603,7 +628,8 @@ class Messagebox(tk.CTkToplevel):
         self.focus_force()
         self.grab_set()
 
-    def destroy(self):
+    def destroy(self) -> None:
+        """Знищує вікно"""
         self.grab_release()
         super().destroy()
 
@@ -646,7 +672,7 @@ class Body(tk.CTkFrame):
         # запустити початковий екран
         self.starting_screen()
 
-    def starting_screen(self):
+    def starting_screen(self) -> None:
         """Створює початковий екран"""
         # очистити вікно
         for widget in self.winfo_children():
@@ -691,7 +717,7 @@ class Body(tk.CTkFrame):
         # здійснити конфігурацію колонок
         self.grid_columnconfigure(1)
 
-    def configure_testing(self):
+    def configure_testing(self) -> None:
         """Запускає тестування"""
         # очистити вікно
         for widget in self.winfo_children():
@@ -738,7 +764,7 @@ class Body(tk.CTkFrame):
         process_button = tk.CTkButton(self, text="Завантажити вправи", command=self.get_tasks, font=self.font_button)
         process_button.grid(row=11, column=0, sticky='ew', pady=10, padx=10)
 
-    def get_tasks(self):
+    def get_tasks(self) -> None:
         """Обирає із БД потрібні вправи"""
         # отримати дані про обрані вправи та завантажити їх
         selected_level = self.level_values.get(self.level_dropdown.get())
@@ -771,7 +797,7 @@ class Body(tk.CTkFrame):
                                       font=self.font_button)
         process_button.grid(row=5, column=0, sticky='ew', pady=10, padx=10)
 
-    def start_testing(self):
+    def start_testing(self) -> None:
         """Здійснює тестування"""
         self.task_num = int(self.quantity_entry.get())
         try:
@@ -801,7 +827,7 @@ class Body(tk.CTkFrame):
                                        font=self.font_button)
             next_button.grid(row=2, column=0, sticky='ew', pady=10, padx=10)
 
-    def play_task(self):
+    def play_task(self) -> None:
         """Заповнює завдання і забирає відповіді"""
         try:
             # забрати попередню відповідь
@@ -873,7 +899,7 @@ class Body(tk.CTkFrame):
 
         return question
 
-    def show_results(self):
+    def show_results(self) -> None:
         """Показує результати проходження тестування"""
         for widget in self.winfo_children():
             widget.destroy()
@@ -894,7 +920,7 @@ class Body(tk.CTkFrame):
                                                   command=self.starting_screen, font=self.font_button)
             starting_screen_button.grid(row=1, column=0, pady=(5, 20), padx=20)
 
-    def show_mistakes(self):
+    def show_mistakes(self) -> None:
         """Показує список помилок із виправленнями"""
         if self.toplevel_window is None or not self.toplevel_window.winfo_exists():
             self.toplevel_window = tk.CTkToplevel(self)
@@ -927,7 +953,7 @@ class Body(tk.CTkFrame):
         else:
             self.toplevel_window.focus()
 
-    def upload_tasks(self):
+    def upload_tasks(self) -> None:
         """Дозволяє завантажити свої тексти у БД"""
         # очистити вікно
         for widget in self.winfo_children():
@@ -974,7 +1000,7 @@ class Body(tk.CTkFrame):
                                       font=self.font_button)
         process_button.grid(row=11, column=0, columnspan=2, sticky='ew', pady=10, padx=10)
 
-    def show_names(self):
+    def show_names(self) -> None:
         """Показує вже зайняті назви наборів з їхніми описами"""
         if self.toplevel_window is None or not self.toplevel_window.winfo_exists():
             sets = SQL.get_sets()
@@ -1004,11 +1030,11 @@ class Body(tk.CTkFrame):
         else:
             self.toplevel_window.focus()
 
-    def choose_file(self):
+    def choose_file(self) -> None:
         """Дозволяє отримати шлях до файлу із текстом для вправ"""
         self.file_path = filedialog.askopenfilename()
 
-    def process_tasks(self):
+    def process_tasks(self) -> None:
         """Обробляє завантажені дані"""
         if SQL.check_sets(self.name_entry.get()) is False:
             if self.file_path:
