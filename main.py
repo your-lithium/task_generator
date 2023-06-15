@@ -185,25 +185,8 @@ class SQL:
 
             # перевірити, чи цільова частина мови (має вказану форму)
             if token['form']:
-                query = f"""SELECT {token['pos']}_id
-                            FROM {token['pos']}
-                            WHERE {token['form']} = '{token['text'].lower()}'
-                                AND """
-                for k, v in token['features'].items():
-                    if v:
-                        query += f"{k} = '{v}' AND "
-                    else:
-                        query += f"{k} IS NULL AND "
-                query = query[:-5]
-                cur.execute(query)
-
-                # перевірити наявність леми у таблиці
-                try:
-                    pos_id = cur.fetchall()[0][0]
-
-                # леми нема у БД: додати її
-                except IndexError:
-                    pos_id = SQL.add_pos(token['pos'], token['forms'], token['features'])
+                # отримати індекс леми із БД
+                pos_id = SQL.add_pos(token['pos'], token['forms'], token['features'])
 
             # нецільова частина мови: не прив'язувати до таблиці
             else:
@@ -226,13 +209,25 @@ class SQL:
         columns = tuple(form_columns + feature_columns)
         values = tuple(form_values + feature_values)
 
-        # вставити дані про леми у таблицю
-        cur.execute(f"""INSERT INTO {pos} {columns}
+        # перевірити, чи є лема вже в таблиці
+        select_query = f"SELECT {pos}_id FROM {pos} WHERE "
+        for i, value in enumerate(values):
+            if value:
+                select_query += f"{columns[i]} = ?"
+            else:
+                select_query += f"{columns[i]} IS NULL"
+
+            if i != len(values) - 1:
+                select_query += " AND "
+        select_values = tuple([value for value in values if value])
+        cur.execute(select_query, select_values)
+
+        try:
+            pos_id = cur.fetchone()[0]
+        except TypeError:
+            cur.execute(f"""INSERT INTO {pos} {columns}
                         VALUES {values}""".replace('None', 'NULL'))
-        cur.execute(f"""SELECT seq
-                        FROM sqlite_sequence
-                        WHERE name = '{pos}'""")
-        pos_id = cur.fetchall()[0][0]
+            pos_id = cur.lastrowid
 
         return pos_id
 
@@ -328,8 +323,16 @@ class Pronoun(Token):
                           'ins': lemma.inflect({'ablt'}).word,
                           'loc': lemma.inflect({'loct'}).word}
         except AttributeError:
-            self.form = None
-            self.forms = None
+            try:
+                self.forms = {'nom': None,
+                              'gen': lemma.inflect({'gent'}).word,
+                              'dat': lemma.inflect({'datv'}).word,
+                              'acc': lemma.inflect({'accs'}).word,
+                              'ins': lemma.inflect({'ablt'}).word,
+                              'loc': lemma.inflect({'loct'}).word}
+            except AttributeError:
+                self.form = None
+                self.forms = None
 
     def get_features(self):
         try:
