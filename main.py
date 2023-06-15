@@ -219,7 +219,7 @@ class SQL:
 
             if i != len(values) - 1:
                 select_query += " AND "
-        select_values = tuple([value for value in values if value])
+        select_values = tuple(value for value in values if value)
         cur.execute(select_query, select_values)
 
         try:
@@ -280,15 +280,12 @@ class Token:
 
     def get_form(self) -> None:
         """Визначає форму слова"""
-        pass
 
     def get_forms(self) -> None:
         """Визначає парадигму леми слова"""
-        pass
 
     def get_features(self) -> None:
         """Визначає незмінні морфологічні значення леми"""
-        pass
 
     def get_dict(self) -> dict:
         """Створює словник з усіма даними про токен"""
@@ -466,7 +463,7 @@ class ProperNoun(Token):
 class Text:
     """Обробляє користувацький текст"""
 
-    # узгодження частиномовних тегів stanza із доступними для обробки класами частин мови
+    # узгодження частиномовних тегів stanza із доступними для обробки класами
     pos_class_mapping = {'PRON': Pronoun,
                          'NOUN': Noun}
 
